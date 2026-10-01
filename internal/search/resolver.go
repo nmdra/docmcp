@@ -19,12 +19,16 @@ var ErrLibraryNotFound = errors.New("library not found")
 
 // Match is one candidate library, as resolve-library-id reports it.
 type Match struct {
-	LibraryID    string
-	Name         string
-	Version      string
-	Description  string
-	BaseURL      string
-	IndexedPages int
+	LibraryID   string
+	Name        string
+	Version     string
+	Description string
+	BaseURL     string
+	// IndexedChunks is how many chunks the library holds. It is deliberately not
+	// named "pages": DocMCP chunks pages structurally, so a page count and a
+	// chunk count are different numbers and calling one the other misleads an
+	// agent choosing between libraries.
+	IndexedChunks int
 }
 
 // Resolver ranks a set of indexed libraries against a name and a query.
@@ -125,12 +129,12 @@ func (r *Resolver) isIndexed(libraryID string) bool {
 
 func (r *Resolver) toMatch(lib source.Source) Match {
 	return Match{
-		LibraryID:    lib.LibraryID,
-		Name:         lib.Name,
-		Version:      lib.Version,
-		Description:  lib.Description,
-		BaseURL:      lib.BaseURL,
-		IndexedPages: r.indexed[lib.LibraryID],
+		LibraryID:     lib.LibraryID,
+		Name:          lib.Name,
+		Version:       lib.Version,
+		Description:   lib.Description,
+		BaseURL:       lib.BaseURL,
+		IndexedChunks: r.indexed[lib.LibraryID],
 	}
 }
 

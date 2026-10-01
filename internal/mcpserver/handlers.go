@@ -210,7 +210,7 @@ func formatLibraries(matches []search.Match) string {
 		if m.Description != "" {
 			fmt.Fprintf(&b, "  Description: %s\n", m.Description)
 		}
-		fmt.Fprintf(&b, "  Indexed Pages: %d\n", m.IndexedPages)
+		fmt.Fprintf(&b, "  Indexed Chunks: %d\n", m.IndexedChunks)
 
 		if others := siblingsOf(matches, m); len(others) > 0 {
 			b.WriteString("  Versions:\n")

@@ -20,23 +20,23 @@ func staticResolver() mcpserver.Resolver {
 		}
 		return []search.Match{
 			{
-				LibraryID:    "/local/pi",
-				Name:         "Pi",
-				Description:  "Pi coding agent documentation",
-				IndexedPages: 61,
+				LibraryID:     "/local/pi",
+				Name:          "Pi",
+				Description:   "Pi coding agent documentation",
+				IndexedChunks: 61,
 			},
 			{
-				LibraryID:    "/local/pi/0.99.2",
-				Name:         "Pi",
-				Version:      "0.99.2",
-				Description:  "Pi coding agent documentation",
-				IndexedPages: 61,
+				LibraryID:     "/local/pi/0.99.2",
+				Name:          "Pi",
+				Version:       "0.99.2",
+				Description:   "Pi coding agent documentation",
+				IndexedChunks: 61,
 			},
 			{
-				LibraryID:    "/local/pi-sdk",
-				Name:         "Pi SDK",
-				Description:  "Pi SDK reference",
-				IndexedPages: 24,
+				LibraryID:     "/local/pi-sdk",
+				Name:          "Pi SDK",
+				Description:   "Pi SDK reference",
+				IndexedChunks: 24,
 			},
 		}, nil
 	})
@@ -117,7 +117,7 @@ func TestResolveLibraryIDTool_ShowsDescriptions(t *testing.T) {
 	if !strings.Contains(got, "Pi coding agent documentation") {
 		t.Errorf("resolve output missing descriptions:\n%s", got)
 	}
-	if !strings.Contains(got, "Indexed Pages") && !strings.Contains(got, "Pages") {
+	if !strings.Contains(got, "Indexed Chunks") {
 		t.Errorf("resolve output missing page counts:\n%s", got)
 	}
 }

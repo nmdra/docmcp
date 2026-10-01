@@ -281,7 +281,18 @@ func (c *Crawler) loadRobots() {
 
 	base := c.filter.baseURL()
 
-	resp, err := c.robotsClient.Get(base + "/robots.txt")
+	// baseURL already ends in "/", so appending "/robots.txt" would request
+	// "//robots.txt". A site that does not treat the empty first segment as the
+	// root answers 404, and DocMCP then concludes robots allows everything — a
+	// disallowed path gets fetched. Resolve against the base instead.
+	robotsURL, err := url.Parse(base)
+	if err != nil {
+		c.robots = &Robots{}
+		return
+	}
+	robotsURL = robotsURL.ResolveReference(&url.URL{Path: "/robots.txt"})
+
+	resp, err := c.robotsClient.Get(robotsURL.String())
 	if err != nil {
 		c.robots = &Robots{}
 		return

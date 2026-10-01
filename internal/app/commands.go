@@ -93,6 +93,17 @@ func newAddCommand(factory runtimeFactory) *cobra.Command {
 			fmt.Fprintf(out, "Discovering documentation...\n")
 
 			report, err := rt.Ingestor.Ingest(ctx, src)
+			if err == nil && report.PagesFetched == 0 {
+				// Zero pages means the crawl matched nothing: a typo'd path, a
+				// site that 404s, a content type we cannot read, or include
+				// rules that exclude everything. Reporting success here leaves
+				// `list` showing a library with 0 pages that an agent will then
+				// try to query. Fail instead, and roll the registration back so
+				// no broken entry survives.
+				err = fmt.Errorf(
+					"the crawl produced no pages; check the URL, that the site serves HTML, " +
+						"and any --include/--exclude rules")
+			}
 			if err != nil {
 				// Roll the registration back: a library with no pages indexed
 				// would show up in `list` as a broken entry.
@@ -141,6 +152,20 @@ func newSyncCommand(factory runtimeFactory) *cobra.Command {
 			report, err := rt.Ingestor.Ingest(ctx, src)
 			if err != nil {
 				return fmt.Errorf("sync %s: %w", src.LibraryID, err)
+			}
+			// Sync does not roll the registration back: the library already
+			// existed and its indexed chunks are still there. An empty crawl is
+			// worth saying out loud — it usually means the site moved or the
+			// rules now exclude everything — but it is not a failure, and
+			// discarding a working index over one bad crawl would be worse.
+			if report.PagesFetched == 0 {
+				kept := 0
+				if n, err := rt.Store.CountChunks(ctx, src.LibraryID); err == nil {
+					kept = n
+				}
+				fmt.Fprintf(cmd.ErrOrStderr(),
+					"warning: the crawl produced no pages; %s keeps its %d indexed chunks\n",
+					src.LibraryID, kept)
 			}
 
 			markSynced(ctx, rt, src)

@@ -110,8 +110,8 @@ func (e *OllamaEmbedder) embedOne(ctx context.Context, text string) ([]float32, 
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("ollama embedder: %s: %s",
-			resp.Status, providerMessage(payload))
+		return nil, fmt.Errorf("ollama embedder: %s from %s for model %s: %s",
+			resp.Status, e.baseURL, e.model, providerMessage(payload))
 	}
 
 	var parsed struct {
@@ -129,10 +129,13 @@ func (e *OllamaEmbedder) embedOne(ctx context.Context, text string) ([]float32, 
 	switch {
 	case len(parsed.Embedding) > 0:
 		return parsed.Embedding, nil
-	case len(parsed.Embeddings) > 0:
+	case len(parsed.Embeddings) > 0 && len(parsed.Embeddings[0]) > 0:
 		return parsed.Embeddings[0], nil
 	default:
-		return nil, fmt.Errorf("ollama embedder: %w: response carried no vector", ErrDimensionMismatch)
+		// A zero-length vector is not a vector. Accepting one would write an
+		// unsearchable chunk into the index and only fail later, at query time.
+		return nil, fmt.Errorf("ollama embedder: %w: response from %s carried no vector for model %s",
+			ErrDimensionMismatch, e.baseURL, e.model)
 	}
 }
 

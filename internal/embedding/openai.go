@@ -130,7 +130,12 @@ func (e *OpenAIEmbedder) Embed(ctx context.Context, texts []string) ([][]float32
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("openai embedder: %s: %s", resp.Status, providerMessage(payload))
+		// The payload is passed through redacted: a provider that rejects a bad
+		// key usually quotes it back in its error text, and that text ends up in
+		// a terminal, a log, and possibly a bug report.
+		return nil, fmt.Errorf("openai embedder: %s from %s for model %s: %s",
+			resp.Status, e.baseURL, e.model,
+			redactSecret(providerMessage(payload), e.apiKey))
 	}
 
 	var parsed struct {
@@ -164,4 +169,16 @@ func (e *OpenAIEmbedder) Embed(ctx context.Context, texts []string) ([][]float32
 	}
 
 	return ordered, nil
+}
+
+// redactSecret removes the API key from text that came from a remote provider.
+//
+// The provider knows the key because we sent it, and providers routinely echo
+// it back ("Incorrect API key provided: sk-..."). Passing that through verbatim
+// puts the secret into terminal scrollback and any log that captures stderr.
+func redactSecret(msg, secret string) string {
+	if secret == "" {
+		return msg
+	}
+	return strings.ReplaceAll(msg, secret, "[redacted]")
 }
