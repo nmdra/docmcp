@@ -3,7 +3,6 @@ package embedding_test
 import (
 	"math"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -185,13 +184,23 @@ func requireLocalProvider(t *testing.T) {
 	}
 }
 
+// localCacheDir points the model tests at the shared machine cache.
+//
+// It deliberately does not use t.TempDir(): the model is ~190 MB, and giving
+// each test its own would download it repeatedly. The directory is overridable
+// so a sandboxed environment can place it somewhere writable.
 func localCacheDir(t *testing.T) string {
 	t.Helper()
 
 	if dir := os.Getenv("DOCMCP_TEST_LOCAL_CACHE"); dir != "" {
 		return dir
 	}
-	return filepath.Join(t.TempDir(), "models")
+
+	dir := embedding.DefaultCacheDir()
+	if dir == "" {
+		t.Skip("no writable cache directory for the local model")
+	}
+	return dir
 }
 
 func sameVector(a, b []float32) bool {

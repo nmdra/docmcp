@@ -134,7 +134,9 @@ model = "all-MiniLM-L6-v2"
 ```
 
 The default embedder runs locally with no API key and no server. On first use it
-downloads the model once into `path/models`; after that everything works
+downloads the model — about 190 MB — into the machine cache
+(`~/.cache/docmcp/models`). It is shared by every index, so it is downloaded once
+per machine rather than once per `--data-dir`. After that everything works
 offline.
 
 ### Other embedders

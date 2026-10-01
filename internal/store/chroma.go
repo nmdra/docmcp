@@ -57,6 +57,33 @@ type ChromaConfig struct {
 	CollectionName string
 }
 
+// collectionConfig declares the index's distance space explicitly.
+//
+// This is not cosmetic. Without a configuration, Chroma builds its own default
+// MiniLM embedding function and dlopens the ONNX runtime — even though DocMCP
+// always supplies pre-computed vectors. That made the store depend on a native
+// library it never uses, and on a machine-mapped download that can crash the
+// process outright (SIGBUS in pure-tokenizers' symbol lookup on CI).
+//
+// Declaring the space keeps the store free of any embedding function: it stores
+// and searches vectors, and nothing more.
+func collectionConfig() *chroma.CollectionConfigurationImpl {
+	return chroma.NewCollectionConfigurationFromMap(map[string]any{
+		"hnsw": map[string]any{
+			// Cosine on normalized vectors: retrieval ranks identically to the
+			// in-memory reference store the contract is checked against.
+			"space":           "cosine",
+			"ef_construction": 100,
+			"ef_search":       10,
+			"max_neighbors":   16,
+			"num_threads":     2,
+			"resize_factor":   10,
+			"sync_threshold":  1000,
+			"batch_size":      200,
+		},
+	})
+}
+
 // NewChromaStore opens a persistent Chroma at cfg.Path and ensures the
 // collection exists.
 func NewChromaStore(ctx context.Context, cfg ChromaConfig) (*ChromaStore, error) {
@@ -80,7 +107,8 @@ func NewChromaStore(ctx context.Context, cfg ChromaConfig) (*ChromaStore, error)
 		return nil, fmt.Errorf("chroma store: open %s: %w", cfg.Path, err)
 	}
 
-	collection, err := client.GetOrCreateCollection(ctx, name)
+	collection, err := client.GetOrCreateCollection(ctx, name,
+		chroma.WithConfigurationCreate(collectionConfig()))
 	if err != nil {
 		return nil, fmt.Errorf("chroma store: collection %q: %w", name, err)
 	}

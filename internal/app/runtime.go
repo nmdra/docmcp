@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 	"net/http"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -216,10 +215,18 @@ func newEmbedder(cfg config.Config) (*embedding.Service, error) {
 
 	case "default", "":
 		// The built-in model needs no key and no server, so it is the default.
-		// It is loaded once per process; the model lives under the data directory
-		// so a machine has exactly one copy.
+		// The model is ~190 MB and the same for every index, so it goes in the
+		// machine cache: one copy, not one per --data-dir.
+		cacheDir := embedding.DefaultCacheDir()
+		if cacheDir == "" {
+			return nil, fmt.Errorf(
+				"cannot locate a cache directory for the built-in embedder; " +
+					"set embedding.provider to \"ollama\" or \"openai\", " +
+					"or set XDG_CACHE_HOME")
+		}
+
 		provider, err := embedding.NewLocalEmbedder(embedding.LocalConfig{
-			CacheDir: filepath.Join(cfg.Data.Path, "models"),
+			CacheDir: cacheDir,
 			Timeout:  cfg.Crawler.RequestTimeout,
 		})
 		if err != nil {

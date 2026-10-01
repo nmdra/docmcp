@@ -25,9 +25,27 @@ const defaultDimensions = 384
 type LocalConfig struct {
 	// CacheDir is where the ONNX runtime and model are downloaded and kept. It is
 	// required: the model is large enough that a guessed location is unhelpful.
+	// Use DefaultCacheDir unless you have a reason not to.
 	CacheDir string
 
 	Timeout time.Duration
+}
+
+// DefaultCacheDir is the shared, per-machine location for the embedder's model.
+//
+// The model is roughly 190 MB and is identical for every index, so it belongs in
+// a machine-level cache rather than beside any one index. Keeping it under a
+// data directory would re-download the model for every --data-dir, and because
+// the runtime loads it once per process, a second data dir would silently reuse
+// the first one's copy.
+func DefaultCacheDir() string {
+	if dir, err := os.UserCacheDir(); err == nil && dir != "" {
+		return filepath.Join(dir, "docmcp", "models")
+	}
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		return filepath.Join(home, ".cache", "docmcp", "models")
+	}
+	return ""
 }
 
 // LocalEmbedder runs the built-in sentence-transformer in-process through ONNX.

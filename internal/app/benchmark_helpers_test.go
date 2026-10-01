@@ -38,7 +38,10 @@ func benchmarkEngine(t *testing.T) (*search.Engine, []benchmarkDoc) {
 	}
 	t.Cleanup(func() { st.Close() })
 
-	embedder, err := embedding.NewLocalEmbedder(embedding.LocalConfig{CacheDir: dataDir})
+	// The model comes from the shared machine cache, not the per-test data dir.
+	embedder, err := embedding.NewLocalEmbedder(embedding.LocalConfig{
+		CacheDir: embedding.DefaultCacheDir(),
+	})
 	if err != nil {
 		t.Fatalf("build embedder: %v", err)
 	}

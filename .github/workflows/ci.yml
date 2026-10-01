@@ -35,10 +35,31 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version: 1.27.0
-      # Real Chroma, still no network: the model-downloading and provider suites
-      # stay behind DOCMCP_TEST_LOCAL and run only when asked.
+
+      # The embedded Chroma runtime bootstraps an ONNX shared library and model
+      # into ~/.cache/chroma on first use. Two facts make that hostile to CI:
+      #
+      #   - it costs ~250 MB and over a minute per cold run,
+      #   - several test binaries extracting the same archive concurrently
+      #     corrupted the library and killed the process with SIGBUS.
+      #
+      # Caching it removes the repeated cost; warming it in its own step and
+      # serializing the tests below removes the concurrency.
+      - name: Cache the Chroma runtime
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/chroma
+          key: chroma-runtime-${{ runner.os }}-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            chroma-runtime-${{ runner.os }}-
+
+      - name: Warm the Chroma runtime
+        run: go test -tags=integration -run TestChromaStoreContract/CountChunks ./internal/store/
+
+      # -p 1 stops go test running package binaries in parallel, which is what
+      # triggered the concurrent extraction.
       - name: integration tests
-        run: go test -tags=integration ./...
+        run: go test -p 1 -count=1 -tags=integration ./...
 
   lint:
     name: lint
