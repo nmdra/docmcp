@@ -1,0 +1,78 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  default: standard
+  enable:
+    - contextcheck # verifies context is passed through correctly
+    - errorlint # finds wrapping issues with errors.Is/As
+    - gocritic # broad set of style/bug checks
+    - goconst # flags repeated string literals that should be constants
+    - gosec # security-focused checks
+    - misspell # catches common misspellings in comments/strings
+    - nolintlint # ensures //nolint directives are well-formed and justified
+    - revive # configurable replacement for the deprecated golint
+    - unconvert # flags unnecessary type conversions
+    - unparam # flags unused function parameters
+    - whitespace # flags unnecessary blank lines
+  settings:
+    errcheck:
+      exclude-functions:
+        - (*os.File).Close
+    govet:
+      # shadow is off: its main output here is `if err := f(); err != nil`,
+      # which is idiomatic Go and not the accidental shadowing the check exists
+      # to catch. Renaming those to satisfy the linter would only obscure them.
+      disable:
+        - shadow
+    gosec:
+      excludes:
+        - G104 # already covered by errcheck
+        # G101 flags the name APIKeyEnvVar, which is the name of an environment
+        # variable, not a credential. Naming that variable is the point.
+        - G101
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      # Tests assert on exact CLI text and deliberately ignore some errors while
+      # checking a failed call, so the strict linters only add noise there.
+      - path: _test\.go
+        linters:
+          - gosec
+          - errcheck
+          - goconst
+          - revive
+          - govet
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+
+formatters:
+  enable:
+    - gci
+    - gofmt
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - localmodule
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

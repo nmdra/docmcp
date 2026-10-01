@@ -1,0 +1,12 @@
+# Binaries
+/docmcp
+/bin/
+/dist/
+
+# Vendored dependencies are created by GoReleaser at build time.
+/vendor/
+
+# Local state
+*.db
+*.sqlite
+/docmcp-data/
