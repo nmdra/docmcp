@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/docmcp/docmcp/internal/chunker"
-	"github.com/docmcp/docmcp/internal/parser"
 )
 
 func chunkDoc(t *testing.T, markdown string, opts ...chunker.Option) []chunker.Chunk {
@@ -16,7 +15,7 @@ func chunkDoc(t *testing.T, markdown string, opts ...chunker.Option) []chunker.C
 		t.Fatalf("NewMarkdownChunker: %v", err)
 	}
 
-	chunks, err := c.Chunk(parser.Document{
+	chunks, err := c.Chunk(chunker.Document{
 		ID:           "doc-1",
 		URL:          "https://docs.acme.test/latest/api",
 		CanonicalURL: "https://docs.acme.test/latest/api",
@@ -263,7 +262,7 @@ func TestChunker_RejectsEmptySourceID(t *testing.T) {
 		t.Fatalf("NewMarkdownChunker: %v", err)
 	}
 
-	_, err = c.Chunk(parser.Document{ID: "d", Markdown: "# A\n\ntext"}, chunker.Locator{})
+	_, err = c.Chunk(chunker.Document{ID: "d", Markdown: "# A\n\ntext"}, chunker.Locator{})
 	if err == nil {
 		t.Error("Chunk with no source ID succeeded, want error")
 	}
