@@ -8,4 +8,5 @@ require (
 	github.com/bmatcuk/doublestar/v4 v4.10.2 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
+	github.com/temoto/robotstxt v1.1.2 // indirect
 )

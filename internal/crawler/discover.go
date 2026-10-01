@@ -61,7 +61,10 @@ func sitemapFromRobots(ctx context.Context, client *http.Client, root *url.URL) 
 	if err != nil {
 		return "", err
 	}
-	return robot.Sitemaps()[0], nil
+	if declared := robot.Sitemaps(); len(declared) > 0 {
+		return declared[0], nil
+	}
+	return "", nil
 }
 
 func looksLikeSitemap(ctx context.Context, client *http.Client, candidate string) (bool, error) {
