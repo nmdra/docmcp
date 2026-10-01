@@ -103,22 +103,25 @@ func TestConfig_ReadsEmbeddingProvider(t *testing.T) {
 func TestConfig_KeepsOpenAIKeyOutOfConfig(t *testing.T) {
 	// The key must come from the environment; a key in the config file would
 	// end up in a file people commit.
-	path := writeConfig(t, "[embedding]\nprovider = \"openai\"\napi_key = \"sk-secret\"\n")
+	t.Setenv("DOCMCP_OPENAI_API_KEY", "sk-from-env")
+
+	path := writeConfig(t,
+		"[embedding]\nprovider = \"openai\"\nmodel = \"m\"\napi_key = \"sk-from-file\"\n")
 
 	cfg, err := config.Load(path)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
 
-	if cfg.Embedding.APIKey != "" {
-		t.Errorf("APIKey = %q, want it ignored from the config file", cfg.Embedding.APIKey)
+	if cfg.Embedding.APIKey != "sk-from-env" {
+		t.Errorf("APIKey = %q, want the environment value to win over the file", cfg.Embedding.APIKey)
 	}
 }
 
 func TestConfig_ReadsOpenAIKeyFromEnvironment(t *testing.T) {
 	t.Setenv("DOCMCP_OPENAI_API_KEY", "sk-from-env")
 
-	cfg, err := config.Load(writeConfig(t, "[embedding]\nprovider = \"openai\"\n"))
+	cfg, err := config.Load(writeConfig(t, "[embedding]\nprovider = \"openai\"\nmodel = \"m\"\n"))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -225,6 +228,7 @@ func TestConfig_DoesNotReadUserConfigInTests(t *testing.T) {
 
 func TestConfig_ValidateRejectsEmptyDataPath(t *testing.T) {
 	cfg := config.Default()
+	cfg.Data.Path = ""
 
 	if err := cfg.Validate(); err == nil {
 		t.Error("Validate accepted an empty data path, want error")
