@@ -11,6 +11,7 @@ import (
 	"github.com/docmcp/docmcp/internal/crawler"
 	"github.com/docmcp/docmcp/internal/embedding"
 	"github.com/docmcp/docmcp/internal/ingest"
+	"github.com/docmcp/docmcp/internal/search"
 	"github.com/docmcp/docmcp/internal/source"
 	"github.com/docmcp/docmcp/internal/store"
 )
@@ -33,6 +34,47 @@ type Runtime struct {
 type Ingestor interface {
 	Ingest(ctx context.Context, src source.Source) (ingest.Report, error)
 	Remove(ctx context.Context, sourceID string) error
+}
+
+// SearchEngine returns the retrieval engine for this runtime. Both the CLI
+// search command and the MCP server use it, so an agent and a user always get
+// the same answer to the same question.
+func (r *Runtime) SearchEngine() (*search.Engine, error) {
+	return search.NewEngine(r.Store, r.Embedder, search.Options{
+		CandidateCount: r.Config.Search.CandidateCount,
+		FinalChunks:    r.Config.Search.FinalChunks,
+	})
+}
+
+// Resolver returns a resolver over the given libraries, restricted to those
+// that actually have indexed content. Offering an empty library would send an
+// agent to a dead end.
+func (r *Runtime) Resolver(_ context.Context, libraries []source.Source) *search.Resolver {
+	resolver := search.NewResolver(libraries)
+
+	indexed := map[string]int{}
+	for _, lib := range libraries {
+		if n, err := r.Store.CountChunks(context.Background(), lib.LibraryID); err == nil && n > 0 {
+			indexed[lib.LibraryID] = n
+		}
+	}
+	resolver.SetIndexed(indexed)
+
+	return resolver
+}
+
+// RequireIndexed reports an error when a library ID is well formed but has no
+// indexed content. It is the difference between "no such library" and "that page
+// did not match", which an agent cannot otherwise tell apart.
+func (r *Runtime) RequireIndexed(ctx context.Context, libraryID string) error {
+	count, err := r.Store.CountChunks(ctx, libraryID)
+	if err != nil {
+		return fmt.Errorf("check library %s: %w", libraryID, err)
+	}
+	if count == 0 {
+		return fmt.Errorf("library %s is not indexed; add it with `docmcp add`", libraryID)
+	}
+	return nil
 }
 
 // Close releases the store. The CLI defers this once per run.
