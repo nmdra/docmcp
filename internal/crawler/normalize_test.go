@@ -7,7 +7,7 @@ import (
 )
 
 func TestNormalizeURL_RemovesFragment(t *testing.T) {
-	got, err := crawler.NormalizeURL("https://example.com/docs/mcp#exposure", nil)
+	got, err := crawler.NormalizeURL("https://example.com/docs/mcp#exposure", "")
 	if err != nil {
 		t.Fatalf("NormalizeURL: %v", err)
 	}
@@ -17,7 +17,7 @@ func TestNormalizeURL_RemovesFragment(t *testing.T) {
 }
 
 func TestNormalizeURL_RemovesTrackingParameters(t *testing.T) {
-	got, err := crawler.NormalizeURL("https://example.com/docs/a?utm_source=x#intro", nil)
+	got, err := crawler.NormalizeURL("https://example.com/docs/a?utm_source=x#intro", "")
 	if err != nil {
 		t.Fatalf("NormalizeURL: %v", err)
 	}
@@ -27,7 +27,7 @@ func TestNormalizeURL_RemovesTrackingParameters(t *testing.T) {
 }
 
 func TestNormalizeURL_ResolvesRelativeURL(t *testing.T) {
-	base, err := crawler.NormalizeURL("https://example.com/docs/latest/index.html", nil)
+	base, err := crawler.NormalizeURL("https://example.com/docs/latest/index.html", "")
 	if err != nil {
 		t.Fatalf("NormalizeURL base: %v", err)
 	}
@@ -42,7 +42,7 @@ func TestNormalizeURL_ResolvesRelativeURL(t *testing.T) {
 }
 
 func TestNormalizeURL_NormalizesHostCasing(t *testing.T) {
-	got, err := crawler.NormalizeURL("HTTPS://Example.COM/Docs/MCP", nil)
+	got, err := crawler.NormalizeURL("HTTPS://Example.COM/Docs/MCP", "")
 	if err != nil {
 		t.Fatalf("NormalizeURL: %v", err)
 	}
@@ -60,7 +60,7 @@ func TestNormalizeURL_NormalizesTrailingSlash(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		got, err := crawler.NormalizeURL(tc.in, nil)
+		got, err := crawler.NormalizeURL(tc.in, "")
 		if err != nil {
 			t.Errorf("NormalizeURL(%q): %v", tc.in, err)
 			continue
@@ -81,14 +81,14 @@ func TestNormalizeURL_RejectsUnsupportedSchemes(t *testing.T) {
 		"ftp://example.com/docs",
 		"unix:///tmp/sock",
 	} {
-		if _, err := crawler.NormalizeURL(raw, nil); err == nil {
+		if _, err := crawler.NormalizeURL(raw, ""); err == nil {
 			t.Errorf("NormalizeURL(%q) succeeded, want error", raw)
 		}
 	}
 }
 
 func TestNormalizeURL_PreservesMeaningfulQuery(t *testing.T) {
-	got, err := crawler.NormalizeURL("https://example.com/docs/a?v=2&utm_medium=y", nil)
+	got, err := crawler.NormalizeURL("https://example.com/docs/a?v=2&utm_medium=y", "")
 	if err != nil {
 		t.Fatalf("NormalizeURL: %v", err)
 	}
@@ -100,7 +100,7 @@ func TestNormalizeURL_PreservesMeaningfulQuery(t *testing.T) {
 func TestNormalizeURL_KeepsConfiguredQueryParameters(t *testing.T) {
 	keep := crawler.KeepQueryParams{"v", "lang"}
 
-	got, err := crawler.NormalizeURL("https://example.com/docs/a?v=2&lang=de&ref=nav", keep)
+	got, err := crawler.NormalizeURL("https://example.com/docs/a?v=2&lang=de&fbclid=abc", "", keep)
 	if err != nil {
 		t.Fatalf("NormalizeURL: %v", err)
 	}
@@ -118,15 +118,14 @@ func TestNormalizeURL_DeduplicatesTrackingVariants(t *testing.T) {
 		"https://example.com/docs/mcp?utm_campaign=a&utm_content=b",
 	}
 
-	seen := map[string]string{}
+	want := "https://example.com/docs/mcp"
 	for _, raw := range variants {
-		got, err := crawler.NormalizeURL(raw, nil)
+		got, err := crawler.NormalizeURL(raw, "")
 		if err != nil {
 			t.Fatalf("NormalizeURL(%q): %v", raw, err)
 		}
-		if first, dup := seen[got]; dup {
-			t.Errorf("%q and %q both normalize to %q", first, raw, got)
+		if got != want {
+			t.Errorf("NormalizeURL(%q) = %q, want %q", raw, got, want)
 		}
-		seen[got] = raw
 	}
 }
