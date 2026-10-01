@@ -2,6 +2,7 @@ package mcpserver_test
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -74,6 +75,13 @@ func callTool(t *testing.T, session *mcp.ClientSession, name string, args map[st
 			text.WriteString(tc.Text)
 		}
 	}
+
+	// A failed tool call comes back as content with IsError set, not as a
+	// protocol error: that is what lets a model read the message and retry.
+	if result.IsError {
+		return text.String(), fmt.Errorf("tool %s reported: %s", name, strings.TrimSpace(text.String()))
+	}
+
 	return text.String(), nil
 }
 
