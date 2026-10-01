@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -13,11 +14,13 @@ import (
 var version = "dev"
 
 func main() {
+	ctx := context.Background()
+
 	root := app.NewRootCommand(version)
 	root.SetOut(os.Stdout)
 	root.SetErr(os.Stderr)
 
-	if err := root.Execute(); err != nil {
+	if err := root.ExecuteContext(ctx); err != nil {
 		fmt.Fprintln(os.Stderr, "docmcp:", err)
 		os.Exit(1)
 	}

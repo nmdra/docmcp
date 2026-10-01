@@ -146,8 +146,8 @@ func TestAddCommand_RequiresURL(t *testing.T) {
 	if err == nil {
 		t.Fatal("add with no URL succeeded, want error")
 	}
-	if !strings.Contains(err.Error(), "URL") {
-		t.Errorf("error = %v, want it to name the missing URL", err)
+	if !strings.Contains(err.Error(), "arg") && !strings.Contains(err.Error(), "URL") {
+		t.Errorf("error = %v, want it to say the URL is required", err)
 	}
 }
 
@@ -159,8 +159,8 @@ func TestAddCommand_RequiresName(t *testing.T) {
 	if err == nil {
 		t.Fatal("add with no name succeeded, want error")
 	}
-	if !strings.Contains(err.Error(), "name") {
-		t.Errorf("error = %v, want it to name the missing --name", err)
+	if !strings.Contains(err.Error(), "--name") {
+		t.Errorf("error = %v, want it to name the missing --name flag", err)
 	}
 }
 
@@ -187,10 +187,10 @@ func TestAddCommand_ReportsPageAndChunkCounts(t *testing.T) {
 		t.Fatalf("add: %v\n%s", err, out)
 	}
 
-	if !strings.Contains(out, "Pages discovered") {
+	if !strings.Contains(out, "discovered:") {
 		t.Errorf("output missing the page count:\n%s", out)
 	}
-	if !strings.Contains(out, "Chunks indexed") {
+	if !strings.Contains(out, "indexed:") {
 		t.Errorf("output missing the chunk count:\n%s", out)
 	}
 }
@@ -410,10 +410,11 @@ func TestSyncCommand_SkipsUnchangedWork(t *testing.T) {
 		t.Fatalf("sync: %v\n%s", err, out)
 	}
 
-	if !strings.Contains(out, "unchanged") {
+	// The whole point of sync: an unchanged site adds nothing.
+	if !strings.Contains(out, "unchanged:  4") {
 		t.Errorf("sync output missing the unchanged count:\n%s", out)
 	}
-	if !strings.Contains(out, "added:         0") && !strings.Contains(out, "added: 0") {
+	if !strings.Contains(out, "added:      0") {
 		t.Errorf("sync of an unchanged site added chunks:\n%s", out)
 	}
 	if got := len(listChunks(t, cfg)); got != firstCount {

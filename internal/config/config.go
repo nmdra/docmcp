@@ -175,6 +175,10 @@ func (c Config) Validate() error {
 	}
 
 	switch c.Embedding.Provider {
+	case "fake":
+		// Test-only provider: a deterministic in-process embedder. Accepting it
+		// here keeps it selectable by a test config without opening a hole in
+		// the real providers.
 	case "default", "":
 		if strings.TrimSpace(c.Embedding.Model) == "" {
 			c.Embedding.Model = DefaultEmbeddingModel

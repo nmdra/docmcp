@@ -169,6 +169,12 @@ func newEmbedder(cfg config.Config) (*embedding.Service, error) {
 		}
 		return embedding.NewService(provider), nil
 
+	case "fake":
+		// Test-only: a deterministic in-process embedder, selectable solely by a
+		// config that names this provider. It lets the CLI be tested without a
+		// model and produces identical vectors for identical text.
+		return embedding.NewService(newFakeEmbedder(8)), nil
+
 	default:
 		return nil, fmt.Errorf(
 			"the built-in %q embedder is not available yet; "+
@@ -176,3 +182,35 @@ func newEmbedder(cfg config.Config) (*embedding.Service, error) {
 			cfg.Embedding.Provider, config.DefaultPath())
 	}
 }
+
+// fakeEmbedder is a deterministic in-process embedder used by tests. It is only
+// reachable when a config names the provider "fake", which no real config does.
+type fakeEmbedder struct{ dim int }
+
+func newFakeEmbedder(dim int) *fakeEmbedder {
+	if dim <= 0 {
+		dim = 8
+	}
+	return &fakeEmbedder{dim: dim}
+}
+
+func (f *fakeEmbedder) Embed(_ context.Context, texts []string) ([][]float32, error) {
+	out := make([][]float32, len(texts))
+	for i, text := range texts {
+		v := make([]float32, f.dim)
+		sum := 0
+		for _, r := range text {
+			sum += int(r)
+		}
+		for j := range v {
+			v[j] = float32((sum*(j+1))%89) / 89
+		}
+		v[0] += 1
+		out[i] = v
+	}
+	return out, nil
+}
+
+func (f *fakeEmbedder) Provider() string { return "fake" }
+func (f *fakeEmbedder) Model() string    { return "fake-model" }
+func (f *fakeEmbedder) Dimensions() int  { return f.dim }
