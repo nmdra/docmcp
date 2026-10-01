@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "docmcp": {
+      "command": "docmcp",
+      "args": ["serve"]
+    }
+  }
+}
