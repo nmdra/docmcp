@@ -1,6 +1,7 @@
 package store_test
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 	"testing"
@@ -34,9 +35,7 @@ func RunStoreContractTests(t *testing.T, create Factory) {
 			ContentHash: "hash-1",
 		}
 
-		if err := s.UpsertChunks(ctx, []store.Chunk{chunk}, nil); err != nil {
-			t.Fatalf("UpsertChunks: %v", err)
-		}
+		seed(t, s, []store.Chunk{chunk})
 
 		got, err := s.GetChunk(ctx, "chunk-1")
 		if err != nil {
@@ -61,17 +60,13 @@ func RunStoreContractTests(t *testing.T, create Factory) {
 			ID: "chunk-1", SourceID: "acme", LibraryID: "/local/acme/1",
 			Content: "Old content.", ContentHash: "hash-1",
 		}
-		if err := s.UpsertChunks(ctx, []store.Chunk{original}, nil); err != nil {
-			t.Fatalf("first UpsertChunks: %v", err)
-		}
+		seed(t, s, []store.Chunk{original})
 
 		edited := original
 		edited.Content = "New content."
 		edited.ContentHash = "hash-2"
 
-		if err := s.UpsertChunks(ctx, []store.Chunk{edited}, nil); err != nil {
-			t.Fatalf("second UpsertChunks: %v", err)
-		}
+		seed(t, s, []store.Chunk{edited})
 
 		got, err := s.GetChunk(ctx, "chunk-1")
 		if err != nil {
@@ -97,12 +92,10 @@ func RunStoreContractTests(t *testing.T, create Factory) {
 		s := create(t)
 		ctx := t.Context()
 
-		if err := s.UpsertChunks(ctx, []store.Chunk{
+		seed(t, s, []store.Chunk{
 			{ID: "chunk-1", SourceID: "acme", LibraryID: "/local/acme/1", Content: "keep"},
 			{ID: "chunk-2", SourceID: "acme", LibraryID: "/local/acme/1", Content: "drop"},
-		}, nil); err != nil {
-			t.Fatalf("UpsertChunks: %v", err)
-		}
+		})
 
 		if err := s.DeleteChunks(ctx, []string{"chunk-2"}); err != nil {
 			t.Fatalf("DeleteChunks: %v", err)
@@ -228,9 +221,11 @@ func RunStoreContractTests(t *testing.T, create Factory) {
 				Content: "The cache evicts entries after their TTL expires."},
 		})
 
+		// The query vector is the target chunk's own embedding, so the nearest
+		// hit is unambiguous whatever distance metric the store uses.
 		results, err := s.Query(ctx, store.Query{
 			LibraryID: "/local/acme/1",
-			Embedding: []float32{0.1, 0.9, 0.0},
+			Embedding: testVector("Bearer tokens authenticate every request.", 8),
 			TopK:      3,
 		})
 		if err != nil {
@@ -248,16 +243,17 @@ func RunStoreContractTests(t *testing.T, create Factory) {
 		s := create(t)
 		ctx := t.Context()
 
+		vector := testVector("same text", 8)
 		seed(t, s, []store.Chunk{
 			{ID: "mine", SourceID: "acme", LibraryID: "/local/acme/1",
-				Content: "same text", Embedding: []float32{0.1, 0.9}},
+				Content: "same text", Embedding: vector},
 			{ID: "theirs", SourceID: "other", LibraryID: "/local/other/1",
-				Content: "same text", Embedding: []float32{0.1, 0.9}},
+				Content: "same text", Embedding: vector},
 		})
 
 		results, err := s.Query(ctx, store.Query{
 			LibraryID: "/local/acme/1",
-			Embedding: []float32{0.1, 0.9},
+			Embedding: vector,
 			TopK:      5,
 		})
 		if err != nil {
@@ -281,14 +277,14 @@ func RunStoreContractTests(t *testing.T, create Factory) {
 				SourceID:  "acme",
 				LibraryID: "/local/acme/1",
 				Content:   "chunk",
-				Embedding: []float32{float32(i) / 10, 1},
+				Embedding: testVector(fmt.Sprintf("chunk %d", i), 8),
 			})
 		}
 		seed(t, s, chunks)
 
 		results, err := s.Query(ctx, store.Query{
 			LibraryID: "/local/acme/1",
-			Embedding: []float32{0.5, 1},
+			Embedding: testVector("chunk 5", 8),
 			TopK:      3,
 		})
 		if err != nil {
@@ -305,7 +301,7 @@ func RunStoreContractTests(t *testing.T, create Factory) {
 
 		results, err := s.Query(ctx, store.Query{
 			LibraryID: "/local/nothing/9",
-			Embedding: []float32{0.1, 0.2},
+			Embedding: testVector("anything", 8),
 			TopK:      5,
 		})
 		if err != nil {
@@ -425,9 +421,7 @@ func PersistAcrossRestart(t *testing.T, create func(t *testing.T) store.Store) {
 	}
 
 	first := create(t)
-	if err := first.UpsertChunks(ctx, []store.Chunk{chunk}, nil); err != nil {
-		t.Fatalf("UpsertChunks: %v", err)
-	}
+	seed(t, first, []store.Chunk{chunk})
 	if err := first.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
@@ -444,12 +438,43 @@ func PersistAcrossRestart(t *testing.T, create func(t *testing.T) store.Store) {
 	}
 }
 
+// seed stores chunks with a deterministic vector each. A vector store cannot
+// hold an unembedded chunk, so seeding without embeddings is not a case the
+// contract can describe.
 func seed(t *testing.T, s store.Store, chunks []store.Chunk) {
 	t.Helper()
 
-	if err := s.UpsertChunks(t.Context(), chunks, nil); err != nil {
+	ctx := t.Context()
+
+	vectors := make([][]float32, len(chunks))
+	for i, c := range chunks {
+		if len(c.Embedding) == 0 {
+			vectors[i] = testVector(c.Content, 8)
+			continue
+		}
+		vectors[i] = c.Embedding
+	}
+
+	if err := s.UpsertChunks(ctx, chunks, vectors); err != nil {
 		t.Fatalf("UpsertChunks: %v", err)
 	}
+}
+
+// testVector maps text onto a stable unit-ish vector: identical text produces an
+// identical vector, and different text produces a different one, which is what
+// ranking assertions need.
+func testVector(text string, dim int) []float32 {
+	v := make([]float32, dim)
+
+	var sum int
+	for _, r := range text {
+		sum += int(r)
+	}
+	for i := range v {
+		v[i] = float32((sum*(i+1))%97) / 97
+	}
+	v[0] += 1 // keep the vector non-zero so cosine distance is defined
+	return v
 }
 
 func ids(chunks []store.Chunk) []string {
