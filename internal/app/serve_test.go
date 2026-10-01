@@ -26,7 +26,18 @@ func startServe(t *testing.T, dataDir string) *serveProcess {
 
 	binary := buildBinary(t)
 
-	cmd := exec.Command(binary, "serve", "--data-dir", dataDir)
+	// The child process needs an explicit config: without one it would read the
+	// real user config, and its embedder would have to be a real model.
+	configPath := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(configPath,
+		[]byte("[embedding]\nprovider = \"fake\"\nmodel = \"fake-model\"\n"), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	cmd := exec.Command(binary, "serve",
+		"--data-dir", dataDir,
+		"--config", configPath,
+	)
 	cmd.Env = append(os.Environ(), "DOCMCP_LOG_LEVEL=error")
 
 	stdin, err := cmd.StdinPipe()

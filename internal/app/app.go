@@ -76,6 +76,7 @@ func NewRootCommand(version string, factory ...runtimeFactory) *cobra.Command {
 		newInfoCommand(build),
 		newRemoveCommand(build),
 		newSearchCommand(build),
+		newServeCommand(build, version),
 		newVersionCommand(version),
 	)
 
