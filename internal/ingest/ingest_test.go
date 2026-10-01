@@ -12,7 +12,7 @@ import (
 
 // newChunker wires the real chunker, so chunk IDs and hashes under test are the
 // ones production produces. Faking the chunker here would test nothing.
-func newChunker() chunker.Chunker {
+func newChunker() ingest.Chunker {
 	c, err := chunker.NewMarkdownChunker()
 	if err != nil {
 		panic(err)
@@ -69,8 +69,8 @@ func TestIngestor_AddWebsite(t *testing.T) {
 	emb := newFakeEmbedder()
 
 	ing := newIngestor(t, []ingest.Page{
-		page("https://docs.acme.test/api", "API", docA),
-		page("https://docs.acme.test/requests", "Requests", docB),
+		page("https://docs.acme.test/api", docA),
+		page("https://docs.acme.test/requests", docB),
 	}, st, emb)
 
 	report, err := ing.Ingest(t.Context(), testSource())
@@ -95,7 +95,7 @@ func TestIngestor_AddWebsite(t *testing.T) {
 func TestIngestor_StoresChunks(t *testing.T) {
 	st := newFakeStore()
 	ing := newIngestor(t, []ingest.Page{
-		page("https://docs.acme.test/api", "API", docA),
+		page("https://docs.acme.test/api", docA),
 	}, st, newFakeEmbedder())
 
 	if _, err := ing.Ingest(t.Context(), testSource()); err != nil {
@@ -121,7 +121,7 @@ func TestIngestor_StoresChunks(t *testing.T) {
 func TestIngestor_StoresMetadata(t *testing.T) {
 	st := newFakeStore()
 	ing := newIngestor(t, []ingest.Page{
-		page("https://docs.acme.test/api", "API", docA),
+		page("https://docs.acme.test/api", docA),
 	}, st, newFakeEmbedder())
 
 	if _, err := ing.Ingest(t.Context(), testSource()); err != nil {
@@ -137,8 +137,8 @@ func TestIngestor_StoresMetadata(t *testing.T) {
 		if c.URL != "https://docs.acme.test/api" {
 			t.Errorf("URL = %q, want the page URL so results are citable", c.URL)
 		}
-		if c.Title != "API" {
-			t.Errorf("Title = %q, want API", c.Title)
+		if c.Title != "doc" {
+			t.Errorf("Title = %q, want the title the parser produced", c.Title)
 		}
 		if c.DocumentID == "" {
 			t.Error("DocumentID is empty")
@@ -150,7 +150,7 @@ func TestIngestor_StoresMetadata(t *testing.T) {
 }
 
 func TestIngestor_SkipsUnchangedChunks(t *testing.T) {
-	pages := []ingest.Page{page("https://docs.acme.test/api", "API", docA)}
+	pages := []ingest.Page{page("https://docs.acme.test/api", docA)}
 
 	st := newFakeStore()
 	first := newFakeEmbedder()
@@ -195,7 +195,7 @@ func TestIngestor_SkipsUnchangedChunks(t *testing.T) {
 
 func TestIngestor_UpdatesChangedChunks(t *testing.T) {
 	st := newFakeStore()
-	ing := newIngestor(t, []ingest.Page{page("https://docs.acme.test/api", "API", docA)}, st, newFakeEmbedder())
+	ing := newIngestor(t, []ingest.Page{page("https://docs.acme.test/api", docA)}, st, newFakeEmbedder())
 
 	if _, err := ing.Ingest(t.Context(), testSource()); err != nil {
 		t.Fatalf("first Ingest: %v", err)
@@ -208,7 +208,7 @@ func TestIngestor_UpdatesChangedChunks(t *testing.T) {
 		st2.existing[c.ID] = c
 	}
 	emb := newFakeEmbedder()
-	ing2 := newIngestor(t, []ingest.Page{page("https://docs.acme.test/api", "API", changed)}, st2, emb)
+	ing2 := newIngestor(t, []ingest.Page{page("https://docs.acme.test/api", changed)}, st2, emb)
 
 	report, err := ing2.Ingest(t.Context(), testSource())
 	if err != nil {
@@ -236,8 +236,8 @@ func TestIngestor_UpdatesChangedChunks(t *testing.T) {
 func TestIngestor_RemovesDeletedChunks(t *testing.T) {
 	st := newFakeStore()
 	ing := newIngestor(t, []ingest.Page{
-		page("https://docs.acme.test/api", "API", docA),
-		page("https://docs.acme.test/requests", "Requests", docB),
+		page("https://docs.acme.test/api", docA),
+		page("https://docs.acme.test/requests", docB),
 	}, st, newFakeEmbedder())
 
 	if _, err := ing.Ingest(t.Context(), testSource()); err != nil {
@@ -268,7 +268,7 @@ func TestIngestor_RemovesDeletedChunks(t *testing.T) {
 		st2.existing[c.ID] = c
 	}
 	ing2 := newIngestor(t, []ingest.Page{
-		page("https://docs.acme.test/api", "API", docA),
+		page("https://docs.acme.test/api", docA),
 	}, st2, newFakeEmbedder())
 
 	report, err := ing2.Ingest(t.Context(), testSource())
@@ -292,8 +292,8 @@ func TestIngestor_RemovesDeletedChunks(t *testing.T) {
 
 func TestIngestor_ChunkIDsAreStableAcrossRuns(t *testing.T) {
 	pages := []ingest.Page{
-		page("https://docs.acme.test/api", "API", docA),
-		page("https://docs.acme.test/requests", "Requests", docB),
+		page("https://docs.acme.test/api", docA),
+		page("https://docs.acme.test/requests", docB),
 	}
 
 	first := newIngestor(t, pages, newFakeStore(), newFakeEmbedder())
@@ -324,8 +324,8 @@ func TestIngestor_SkipsEmptyDocuments(t *testing.T) {
 	emb := newFakeEmbedder()
 
 	pages := []ingest.Page{
-		page("https://docs.acme.test/api", "API", docA),
-		page("https://docs.acme.test/blank", "Blank", "   "),
+		page("https://docs.acme.test/api", docA),
+		page("https://docs.acme.test/blank", "   "),
 	}
 
 	svc, err := ingest.New(
@@ -333,7 +333,7 @@ func TestIngestor_SkipsEmptyDocuments(t *testing.T) {
 		&fakeParser{skip: map[string]bool{"https://docs.acme.test/blank": true}},
 		newChunker(),
 		emb,
-		st,
+		chunkSink{st},
 	)
 	if err != nil {
 		t.Fatalf("ingest.New: %v", err)
@@ -356,7 +356,7 @@ func TestIngestor_SkipsEmptyDocuments(t *testing.T) {
 
 func TestIngestor_RecordsEmbeddingIdentity(t *testing.T) {
 	st := newFakeStore()
-	ing := newIngestor(t, []ingest.Page{page("https://docs.acme.test/api", "API", docA)}, st, newFakeEmbedder())
+	ing := newIngestor(t, []ingest.Page{page("https://docs.acme.test/api", docA)}, st, newFakeEmbedder())
 
 	if _, err := ing.Ingest(t.Context(), testSource()); err != nil {
 		t.Fatalf("Ingest: %v", err)
@@ -375,7 +375,7 @@ func TestIngestor_RefusesWhenEmbeddingModelChanged(t *testing.T) {
 	st.identity = "ollama/nomic-embed-text/768"
 
 	ing := newIngestor(t, []ingest.Page{
-		page("https://docs.acme.test/api", "API", docA),
+		page("https://docs.acme.test/api", docA),
 	}, st, newFakeEmbedder())
 
 	_, err := ing.Ingest(t.Context(), testSource())
@@ -395,7 +395,7 @@ func TestIngestor_AllowsSameEmbeddingModel(t *testing.T) {
 	st.identity = "fake/fake-model/4"
 
 	ing := newIngestor(t, []ingest.Page{
-		page("https://docs.acme.test/api", "API", docA),
+		page("https://docs.acme.test/api", docA),
 	}, st, newFakeEmbedder())
 
 	if _, err := ing.Ingest(t.Context(), testSource()); err != nil {
@@ -411,7 +411,7 @@ func TestIngestor_PropagatesCrawlError(t *testing.T) {
 		&fakeParser{},
 		newChunker(),
 		newFakeEmbedder(),
-		st,
+		chunkSink{st},
 	)
 	if err != nil {
 		t.Fatalf("ingest.New: %v", err)
@@ -427,7 +427,7 @@ func TestIngestor_PropagatesStoreError(t *testing.T) {
 	st.upsertErr = errBoom
 
 	ing := newIngestor(t, []ingest.Page{
-		page("https://docs.acme.test/api", "API", docA),
+		page("https://docs.acme.test/api", docA),
 	}, st, newFakeEmbedder())
 
 	if _, err := ing.Ingest(t.Context(), testSource()); !errors.Is(err, errBoom) {
@@ -441,7 +441,7 @@ func TestIngestor_PropagatesEmbedderError(t *testing.T) {
 	emb.err = errBoom
 
 	ing := newIngestor(t, []ingest.Page{
-		page("https://docs.acme.test/api", "API", docA),
+		page("https://docs.acme.test/api", docA),
 	}, st, emb)
 
 	if _, err := ing.Ingest(t.Context(), testSource()); !errors.Is(err, errBoom) {
@@ -468,7 +468,7 @@ func TestIngestor_NoPagesIsNotAnError(t *testing.T) {
 func TestIngestor_ChunksCarryEmbeddings(t *testing.T) {
 	st := newFakeStore()
 	ing := newIngestor(t, []ingest.Page{
-		page("https://docs.acme.test/api", "API", docA),
+		page("https://docs.acme.test/api", docA),
 	}, st, newFakeEmbedder())
 
 	if _, err := ing.Ingest(t.Context(), testSource()); err != nil {
@@ -488,8 +488,8 @@ func TestIngestor_ChunksCarryEmbeddings(t *testing.T) {
 func TestIngestor_ReportCountsAddUp(t *testing.T) {
 	st := newFakeStore()
 	ing := newIngestor(t, []ingest.Page{
-		page("https://docs.acme.test/api", "API", docA),
-		page("https://docs.acme.test/requests", "Requests", docB),
+		page("https://docs.acme.test/api", docA),
+		page("https://docs.acme.test/requests", docB),
 	}, st, newFakeEmbedder())
 
 	report, err := ing.Ingest(t.Context(), testSource())
@@ -511,7 +511,7 @@ func TestIngestor_StoresChunkWithVectorFromEmbedder(t *testing.T) {
 	emb := newFakeEmbedder()
 
 	ing := newIngestor(t, []ingest.Page{
-		page("https://docs.acme.test/api", "API", docA),
+		page("https://docs.acme.test/api", docA),
 	}, st, emb)
 
 	if _, err := ing.Ingest(t.Context(), testSource()); err != nil {

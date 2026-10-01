@@ -194,21 +194,21 @@ func (f *fakeParser) Parse(page ingest.Page) (ingest.Document, error) {
 		ID:           page.URL,
 		URL:          page.URL,
 		CanonicalURL: page.URL,
-		Title:        page.Title,
+		Title:        "doc",
 		Markdown:     page.Body,
 		ContentHash:  page.Body,
 	}, nil
 }
 
-func newIngestor(t *testing.T, pages []ingest.Page, st store.Store, emb *fakeEmbedder) *ingest.Ingestor {
+func newIngestor(t *testing.T, pages []ingest.Page, st *fakeStore, emb *fakeEmbedder) *ingest.Ingestor {
 	t.Helper()
 
 	svc, err := ingest.New(
 		&fakeCrawler{pages: pages},
 		&fakeParser{},
-		newTestChunker(),
+		newChunker(),
 		newTestEmbeddings(emb),
-		st,
+		chunkSink{st},
 	)
 	if err != nil {
 		t.Fatalf("ingest.New: %v", err)
@@ -216,8 +216,75 @@ func newIngestor(t *testing.T, pages []ingest.Page, st store.Store, emb *fakeEmb
 	return svc
 }
 
-func newTestChunker() ingest.Chunker                      { return newChunker() }
 func newTestEmbeddings(emb *fakeEmbedder) ingest.Embedder { return emb }
+
+// chunkSink adapts the store-shaped fake to the write surface ingestion needs.
+// The types differ on purpose: ingest owns its vocabulary so it does not depend
+// on the storage package.
+type chunkSink struct {
+	*fakeStore
+}
+
+func (c chunkSink) ListChunks(ctx context.Context, filter ingest.ListFilter) ([]ingest.Chunk, error) {
+	chunks, err := c.fakeStore.ListChunks(ctx, store.ListFilter{
+		SourceID:  filter.SourceID,
+		LibraryID: filter.LibraryID,
+		Version:   filter.Version,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]ingest.Chunk, 0, len(chunks))
+	for _, ch := range chunks {
+		out = append(out, toIngestChunk(ch))
+	}
+	return out, nil
+}
+
+func (c chunkSink) UpsertChunks(ctx context.Context, chunks []ingest.Chunk, vectors [][]float32) error {
+	converted := make([]store.Chunk, 0, len(chunks))
+	for _, ch := range chunks {
+		converted = append(converted, fromIngestChunk(ch))
+	}
+	return c.fakeStore.UpsertChunks(ctx, converted, vectors)
+}
+
+func (c chunkSink) DeleteChunks(ctx context.Context, ids []string) error {
+	return c.fakeStore.DeleteChunks(ctx, ids)
+}
+
+func toIngestChunk(c store.Chunk) ingest.Chunk {
+	return ingest.Chunk{
+		ID:          c.ID,
+		SourceID:    c.SourceID,
+		LibraryID:   c.LibraryID,
+		Version:     c.Version,
+		DocumentID:  c.DocumentID,
+		URL:         c.URL,
+		Title:       c.Title,
+		HeadingPath: c.HeadingPath,
+		Index:       c.Index,
+		Content:     c.Content,
+		ContentHash: c.ContentHash,
+	}
+}
+
+func fromIngestChunk(c ingest.Chunk) store.Chunk {
+	return store.Chunk{
+		ID:          c.ID,
+		SourceID:    c.SourceID,
+		LibraryID:   c.LibraryID,
+		Version:     c.Version,
+		DocumentID:  c.DocumentID,
+		URL:         c.URL,
+		Title:       c.Title,
+		HeadingPath: c.HeadingPath,
+		Index:       c.Index,
+		Content:     c.Content,
+		ContentHash: c.ContentHash,
+	}
+}
 
 func testSource() source.Source {
 	return source.Source{
@@ -229,8 +296,8 @@ func testSource() source.Source {
 	}
 }
 
-func page(url, title, body string) ingest.Page {
-	return ingest.Page{URL: url, Title: title, Body: body}
+func page(url, body string) ingest.Page {
+	return ingest.Page{URL: url, Body: body}
 }
 
 const docA = "# API\n\n## Authentication\n\nUse OAuth tokens.\n"
