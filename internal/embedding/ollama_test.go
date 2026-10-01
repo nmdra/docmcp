@@ -145,9 +145,20 @@ func TestOllamaEmbedder_Identity(t *testing.T) {
 	}
 }
 
-func TestOllamaEmbedder_RejectsMissingBaseURL(t *testing.T) {
-	if _, err := embedding.NewOllamaEmbedder(embedding.OllamaConfig{Model: "m"}); err == nil {
-		t.Error("NewOllamaEmbedder without a base URL succeeded, want error")
+func TestOllamaEmbedder_RejectsMissingModel(t *testing.T) {
+	if _, err := embedding.NewOllamaEmbedder(embedding.OllamaConfig{
+		BaseURL: "http://localhost:11434",
+	}); err == nil {
+		t.Error("NewOllamaEmbedder without a model succeeded, want error")
+	}
+}
+
+func TestOllamaEmbedder_RejectsNonHTTPBaseURL(t *testing.T) {
+	if _, err := embedding.NewOllamaEmbedder(embedding.OllamaConfig{
+		BaseURL: "ftp://localhost:11434",
+		Model:   "m",
+	}); err == nil {
+		t.Error("NewOllamaEmbedder with an ftp base URL succeeded, want error")
 	}
 }
 

@@ -201,8 +201,9 @@ func TestOpenAIEmbedder_RejectsMissingModel(t *testing.T) {
 	}
 }
 
-func TestOpenAIEmbedder_MalformedResponse(t *testing.T) {
+func TestOpenAIEmbedder_RejectsShortResponse(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		// One vector for two inputs.
 		w.Write([]byte(`{"data":[{"embedding":[1,2],"index":0}]}`))
 	}))
 	defer srv.Close()
@@ -211,8 +212,45 @@ func TestOpenAIEmbedder_MalformedResponse(t *testing.T) {
 		BaseURL: srv.URL, Model: "m", APIKey: "k",
 	})
 
-	if _, err := e.Embed(t.Context(), []string{"a"}); err == nil {
+	if _, err := e.Embed(t.Context(), []string{"a", "b"}); err == nil {
 		t.Error("Embed accepted a response with the wrong vector count, want error")
+	}
+}
+
+func TestOpenAIEmbedder_ReordersByIndex(t *testing.T) {
+	// A provider is allowed to answer out of order; the index field is the
+	// contract, and pairing rows by arrival would silently misalign vectors
+	// with their chunks.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Input []string `json:"input"`
+		}
+		json.NewDecoder(r.Body).Decode(&req)
+
+		data := make([]map[string]any, len(req.Input))
+		for i := range req.Input {
+			// vector value encodes the requested position
+			data[len(req.Input)-1-i] = map[string]any{
+				"embedding": []float32{float32(i)},
+				"index":     i,
+			}
+		}
+		json.NewEncoder(w).Encode(map[string]any{"data": data})
+	}))
+	defer srv.Close()
+
+	e, _ := embedding.NewOpenAIEmbedder(embedding.OpenAIConfig{
+		BaseURL: srv.URL, Model: "m", APIKey: "k",
+	})
+
+	got, err := e.Embed(t.Context(), []string{"first", "second", "third"})
+	if err != nil {
+		t.Fatalf("Embed: %v", err)
+	}
+	for i, v := range got {
+		if v[0] != float32(i) {
+			t.Errorf("vector %d holds value %v, want %d: rows were paired by arrival", i, v[0], i)
+		}
 	}
 }
 
