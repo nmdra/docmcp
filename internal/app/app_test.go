@@ -25,27 +25,12 @@ func TestVersionCommand(t *testing.T) {
 	}
 }
 
-func TestRootCommand_HasNoMutationToolsOverMCP(t *testing.T) {
+func TestRootCommand_ExposesVersionOnly(t *testing.T) {
 	root := app.NewRootCommand("v0.1.0-test")
 
-	want := map[string]bool{
-		"add": true, "list": true, "info": true, "sync": true,
-		"remove": true, "search": true, "serve": true, "version": true,
-	}
-
-	got := map[string]bool{}
 	for _, cmd := range root.Commands() {
-		got[cmd.Name()] = true
-	}
-
-	for name := range want {
-		if !got[name] {
-			t.Errorf("missing command %q", name)
-		}
-	}
-	for name := range got {
-		if !want[name] {
-			t.Errorf("unexpected command %q", name)
+		if cmd.Name() != "version" {
+			t.Errorf("unexpected command %q in phase 0", cmd.Name())
 		}
 	}
 }
