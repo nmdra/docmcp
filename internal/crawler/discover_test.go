@@ -55,6 +55,9 @@ func TestDiscoverSitemap_IndexFallback(t *testing.T) {
 	mux.HandleFunc("/robots.txt", func(w http.ResponseWriter, _ *http.Request) {
 		w.Write([]byte("User-agent: *\n"))
 	})
+	mux.HandleFunc("/sitemap_index.xml", func(w http.ResponseWriter, _ *http.Request) {
+		w.Write([]byte(`<?xml version="1.0"?><sitemapindex></sitemapindex>`))
+	})
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
@@ -63,7 +66,7 @@ func TestDiscoverSitemap_IndexFallback(t *testing.T) {
 		t.Fatalf("DiscoverSitemap: %v", err)
 	}
 
-	if want := srv.URL + "/sitemap.xml"; got != want {
+	if want := srv.URL + "/sitemap_index.xml"; got != want {
 		t.Errorf("discovered %q, want %q", got, want)
 	}
 }
