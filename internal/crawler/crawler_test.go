@@ -3,6 +3,7 @@ package crawler_test
 import (
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -26,9 +27,16 @@ type fixtureSite struct {
 func newFixtureSite(t *testing.T, pages map[string]string) *fixtureSite {
 	t.Helper()
 
+	// Keys are stored canonicalized, because the crawler normalizes URLs before
+	// fetching: a "/docs/" entry must answer a request for "/docs".
+	byPath := map[string]string{}
+	for p, body := range pages {
+		byPath[canonicalPath(t, p)] = body
+	}
+
 	site := &fixtureSite{
 		pageFunc: func(path string) (string, int) {
-			body, ok := pages[path]
+			body, ok := byPath[path]
 			if !ok {
 				return "not found", http.StatusNotFound
 			}
@@ -51,6 +59,22 @@ func newFixtureSite(t *testing.T, pages map[string]string) *fixtureSite {
 	site.Server = httptest.NewServer(mux)
 	t.Cleanup(site.Close)
 	return site
+}
+
+// canonicalPath applies the same trailing-slash rule the crawler applies, so a
+// "/docs/" fixture entry answers a request for "/docs".
+func canonicalPath(t *testing.T, path string) string {
+	t.Helper()
+
+	normalized, err := crawler.NormalizeURL("https://fixture.invalid"+path, "")
+	if err != nil {
+		t.Fatalf("NormalizeURL(%q): %v", path, err)
+	}
+	u, err := url.Parse(normalized)
+	if err != nil {
+		t.Fatalf("Parse(%q): %v", normalized, err)
+	}
+	return u.Path
 }
 
 func (s *fixtureSite) setPage(path, body string) {
@@ -99,13 +123,12 @@ func newCrawler(t *testing.T, base string, includes, excludes []string, limits c
 		t.Fatalf("NewFilter: %v", err)
 	}
 
-	client := &http.Client{Timeout: 5 * time.Second}
-	fetcher := crawler.NewHTTPFetcher(client, crawler.FetchLimits{
+	fetcher := crawler.NewHTTPFetcher(nil, crawler.FetchLimits{
 		Timeout:      5 * time.Second,
 		MaxBodyBytes: 1 << 20,
 	})
 
-	c, err := crawler.NewCrawler(filter, fetcher, client, limits)
+	c, err := crawler.NewCrawler(filter, fetcher, limits)
 	if err != nil {
 		t.Fatalf("NewCrawler: %v", err)
 	}
@@ -150,7 +173,7 @@ func TestCrawler_SitemapOnlyCrawlsAllowedDocs(t *testing.T) {
 				`<url><loc>` + siteURL + `/blog/news</loc></url>` +
 				`<url><loc>` + siteURL + `/admin</loc></url>` +
 				`</urlset>`, http.StatusOK
-		case "/docs/":
+		case "/docs":
 			return docPage("Docs", "/docs/install", "/docs/api"), http.StatusOK
 		case "/docs/install":
 			return docPage("Install"), http.StatusOK
@@ -267,7 +290,7 @@ func TestCrawler_DoesNotLeavePathPrefix(t *testing.T) {
 
 func TestCrawler_DeduplicatesURLs(t *testing.T) {
 	site := newFixtureSite(t, map[string]string{
-		"/docs/": docPage("Docs",
+		"/docs": docPage("Docs",
 			"/docs/install", "/docs/install/", "/docs/install#top",
 			"/docs/install?utm_source=x", "/docs/api"),
 		"/docs/install": docPage("Install"),
@@ -323,7 +346,7 @@ func TestCrawler_HonorsMaxPages(t *testing.T) {
 
 func TestCrawler_HonorsDepth(t *testing.T) {
 	site := newFixtureSite(t, map[string]string{
-		"/docs/":    docPage("Docs", "/docs/a"),
+		"/docs":     docPage("Docs", "/docs/a"),
 		"/docs/a":   docPage("A", "/docs/a/b"),
 		"/docs/a/b": docPage("A B"),
 	})

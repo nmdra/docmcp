@@ -42,6 +42,11 @@ func NewFilter(baseURL string, includes, excludes []string) (*Filter, error) {
 	}, nil
 }
 
+// baseURL reconstructs the source's entry point, used to locate robots.txt.
+func (f *Filter) baseURL() (string, error) {
+	return f.scheme + "://" + f.host + "/", nil
+}
+
 // Allowed reports whether raw falls inside the source's scope. Unparseable or
 // non-HTTP URLs are outside scope by definition.
 func (f *Filter) Allowed(raw string) bool {
