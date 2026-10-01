@@ -3,7 +3,9 @@ package app
 import (
 	"context"
 	"fmt"
+	"math"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/docmcp/docmcp/internal/chunker"
@@ -215,7 +217,7 @@ func newEmbedder(cfg config.Config) (*embedding.Service, error) {
 		// Test-only: a deterministic in-process embedder, selectable solely by a
 		// config that names this provider. It lets the CLI be tested without a
 		// model and produces identical vectors for identical text.
-		return embedding.NewService(newFakeEmbedder(8)), nil
+		return embedding.NewService(newFakeEmbedder(0)), nil
 
 	default:
 		return nil, fmt.Errorf(
@@ -225,32 +227,80 @@ func newEmbedder(cfg config.Config) (*embedding.Service, error) {
 	}
 }
 
-// fakeEmbedder is a deterministic in-process embedder used by tests. It is only
-// reachable when a config names the provider "fake", which no real config does.
-type fakeEmbedder struct{ dim int }
+// fakeEmbedder is a deterministic in-process embedder used by tests.
+//
+// It is lexical, not semantic: text is projected onto a fixed-width bag-of-words
+// vector, so overlapping wording produces a nearer vector. That is enough to
+// exercise the whole retrieval path — ordering, deduplication, the result
+// budget, version filtering — offline and identically on every run.
+//
+// It is not a stand-in for a real model's semantic quality. Judging whether a
+// query retrieves the *right* section for paraphrased wording needs a real
+// embedder, which is why that check lives in the opt-in provider tests.
+type fakeEmbedder struct {
+	dim int
+}
 
 func newFakeEmbedder(dim int) *fakeEmbedder {
 	if dim <= 0 {
-		dim = 8
+		dim = 256
 	}
 	return &fakeEmbedder{dim: dim}
 }
 
+// Embed projects each text onto a bag-of-words vector. Identical text always
+// yields an identical vector, and a query sharing words with a chunk lands
+// closer to it than one that does not.
 func (f *fakeEmbedder) Embed(_ context.Context, texts []string) ([][]float32, error) {
 	out := make([][]float32, len(texts))
 	for i, text := range texts {
-		v := make([]float32, f.dim)
-		sum := 0
-		for _, r := range text {
-			sum += int(r)
-		}
-		for j := range v {
-			v[j] = float32((sum*(j+1))%89) / 89
-		}
-		v[0] += 1
-		out[i] = v
+		out[i] = f.vector(text)
 	}
 	return out, nil
+}
+
+func (f *fakeEmbedder) vector(text string) []float32 {
+	v := make([]float32, f.dim)
+
+	for _, word := range strings.Fields(strings.ToLower(text)) {
+		hash := fnv32(word)
+		v[hash%uint32(f.dim)] += 1
+	}
+
+	return normalize(v)
+}
+
+// normalize scales a vector to unit length so cosine similarity is meaningful.
+func normalize(v []float32) []float32 {
+	var sum float64
+	for _, x := range v {
+		sum += float64(x) * float64(x)
+	}
+	if sum == 0 {
+		return v
+	}
+
+	scale := float32(1 / math.Sqrt(sum))
+	for i := range v {
+		v[i] *= scale
+	}
+	return v
+}
+
+// fnv32 hashes a word to a bucket. FNV is chosen because it is stable across runs
+// and platforms: a randomized hash would make retrieval order non-reproducible.
+func fnv32(s string) uint32 {
+	const (
+		offset = 2166136261
+		prime  = 16777619
+	)
+
+	hash := uint32(offset)
+	for i := range len(s) {
+		hash ^= uint32(s[i])
+		hash *= prime
+	}
+	return hash
 }
 
 func (f *fakeEmbedder) Provider() string { return "fake" }
