@@ -76,7 +76,8 @@ func TestFilter_IncludeMissingRejects(t *testing.T) {
 
 func TestFilter_ExcludeWins(t *testing.T) {
 	f := newFilter(t, "https://example.com/docs",
-		[]string{"/docs/**"}, []string{"/docs/archive/**"})
+		[]string{"/docs/**"},
+		[]string{"/docs/archive/**", "/docs/internal/**"})
 
 	cases := []struct {
 		raw  string
@@ -86,7 +87,8 @@ func TestFilter_ExcludeWins(t *testing.T) {
 		{"https://example.com/docs/guides/start", true},
 		{"https://example.com/docs/archive/v1", false},
 		{"https://example.com/docs/archive/deep/nested/page", false},
-		{"https://example.com/docs/internal-notes", false},
+		{"https://example.com/docs/internal/spec", false},
+		{"https://example.com/docs/internal-notes", true},
 	}
 
 	for _, tc := range cases {
