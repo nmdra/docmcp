@@ -24,15 +24,21 @@ type serveProcess struct {
 func startServe(t *testing.T, dataDir string) *serveProcess {
 	t.Helper()
 
-	binary := buildBinary(t)
-
-	// The child process needs an explicit config: without one it would read the
-	// real user config, and its embedder would have to be a real model.
 	configPath := filepath.Join(t.TempDir(), "config.toml")
 	if err := os.WriteFile(configPath,
 		[]byte("[embedding]\nprovider = \"fake\"\nmodel = \"fake-model\"\n"), 0o600); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
+
+	return startServeWithConfig(t, dataDir, configPath)
+}
+
+// startServeWithConfig launches `docmcp serve` with an explicit config file, so
+// the child never reads the real user config.
+func startServeWithConfig(t *testing.T, dataDir, configPath string) *serveProcess {
+	t.Helper()
+
+	binary := buildBinary(t)
 
 	cmd := exec.Command(binary, "serve",
 		"--data-dir", dataDir,

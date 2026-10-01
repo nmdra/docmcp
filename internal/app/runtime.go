@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -213,6 +214,19 @@ func newEmbedder(cfg config.Config) (*embedding.Service, error) {
 		}
 		return embedding.NewService(provider), nil
 
+	case "default", "":
+		// The built-in model needs no key and no server, so it is the default.
+		// It is loaded once per process; the model lives under the data directory
+		// so a machine has exactly one copy.
+		provider, err := embedding.NewLocalEmbedder(embedding.LocalConfig{
+			CacheDir: filepath.Join(cfg.Data.Path, "models"),
+			Timeout:  cfg.Crawler.RequestTimeout,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return embedding.NewService(provider), nil
+
 	case "fake":
 		// Test-only: a deterministic in-process embedder, selectable solely by a
 		// config that names this provider. It lets the CLI be tested without a
@@ -221,8 +235,7 @@ func newEmbedder(cfg config.Config) (*embedding.Service, error) {
 
 	default:
 		return nil, fmt.Errorf(
-			"the built-in %q embedder is not available yet; "+
-				"set embedding.provider to \"ollama\" or \"openai\" in %s",
+			"unknown embedding provider %q in %s; use \"default\", \"ollama\", or \"openai\"",
 			cfg.Embedding.Provider, config.DefaultPath())
 	}
 }

@@ -117,12 +117,21 @@ func newTestCommand(t *testing.T) (*bytes.Buffer, config.Config) {
 func runRoot(t *testing.T, cfg config.Config, args ...string) (string, error) {
 	t.Helper()
 
+	return runRootWithConfig(t, cfg, configFileFor(t, cfg), args...)
+}
+
+// runRootWithConfig runs the CLI against an explicit config file. Indexing and
+// serving must use the same one: an index written by a different embedder has
+// vectors of a different width and cannot be queried.
+func runRootWithConfig(t *testing.T, cfg config.Config, configPath string, args ...string) (string, error) {
+	t.Helper()
+
 	var out bytes.Buffer
 
 	root := app.NewRootCommand("v0.1.0-test")
 	root.SetOut(&out)
 	root.SetErr(&out)
-	root.SetArgs(append([]string{"--data-dir", cfg.Data.Path, "--config", configFileFor(t, cfg)}, args...))
+	root.SetArgs(append([]string{"--data-dir", cfg.Data.Path, "--config", configPath}, args...))
 
 	err := root.Execute()
 	return out.String(), err
