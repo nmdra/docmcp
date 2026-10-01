@@ -15,6 +15,10 @@ require (
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.5.2 // indirect
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/PuerkitoBio/goquery v1.9.2 // indirect
+	// Pinned, not floating: chroma-go v0.4.1 depends on chroma-go-local v0.3.4,
+	// whose upstream artifacts are gone (its .mod and .info 404 while the checksum
+	// database still lists it). Bumping either line breaks `go mod download` with a
+	// checksum mismatch. Revisit when upstream republishes.
 	github.com/amikos-tech/chroma-go v0.4.0 // indirect
 	github.com/amikos-tech/chroma-go-local v0.3.3 // indirect
 	github.com/amikos-tech/pure-onnx v0.0.1 // indirect
