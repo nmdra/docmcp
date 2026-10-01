@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Authentication — Acme Docs</title>
+  <link rel="canonical" href="https://docs.acme.test/latest/auth">
+</head>
+<body>
+  <nav>
+    <a href="/latest/">Home</a>
+    <a href="/latest/auth">Auth</a>
+    <a href="/latest/api">API</a>
+  </nav>
+
+  <main>
+    <article>
+      <h1>Authentication</h1>
+
+      <p>The Acme API uses OAuth 2.0 bearer tokens. Send the token in the
+      <code>Authorization</code> header of every request.</p>
+
+      <h2>Obtaining a token</h2>
+
+      <p>Exchange your client credentials at the token endpoint:</p>
+
+      <pre><code class="language-bash">curl -X POST https://api.acme.test/oauth/token \
+  -d grant_type=client_credentials \
+  -d client_id="$ACME_CLIENT_ID" \
+  -d client_secret="$ACME_CLIENT_SECRET"
+</code></pre>
+
+      <p>The response contains a <code>access_token</code> valid for one hour.</p>
+
+      <h2>Rotating keys</h2>
+
+      <p>Keys can overlap. Create the new key before revoking the old one to
+      avoid downtime.</p>
+
+      <ul>
+        <li>Keys are scoped per environment.</li>
+        <li>Revoking a key takes effect within 60 seconds.</li>
+      </ul>
+
+      <h2>API keys</h2>
+
+      <p>Static API keys work for server-to-server calls. See the
+      <a href="/latest/api">API reference</a> for header formats.</p>
+
+      <table>
+        <tr><th>Header</th><th>Value</th></tr>
+        <tr><td>Authorization</td><td>Bearer &lt;token&gt;</td></tr>
+        <tr><td>X-Acme-Key</td><td>&lt;static-key&gt;</td></tr>
+      </table>
+    </article>
+  </main>
+
+  <aside class="sidebar">
+    <p>On this page: tokens, rotation, API keys.</p>
+  </aside>
+
+  <footer>
+    <p>&copy; 2026 Acme. All rights reserved.</p>
+  </footer>
+
+  <script>console.log("tracking");</script>
+  <style>.sidebar { display: none; }</style>
+</body>
+</html>
