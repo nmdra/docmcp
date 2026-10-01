@@ -97,7 +97,7 @@ func newAddCommand(factory runtimeFactory) *cobra.Command {
 				// Roll the registration back: a library with no pages indexed
 				// would show up in `list` as a broken entry.
 				if delErr := rt.Sources.Delete(ctx, id); delErr != nil {
-					return fmt.Errorf("index %s: %w (rollback also failed: %v)", libraryID, err, delErr)
+					return fmt.Errorf("index %s: %w (rollback also failed: %w)", libraryID, err, delErr)
 				}
 				return fmt.Errorf("index %s: %w", libraryID, err)
 			}
@@ -157,7 +157,7 @@ func newListCommand(factory runtimeFactory) *cobra.Command {
 		Use:   "list",
 		Short: "List indexed libraries",
 		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
 
 			rt, err := d.open(ctx, cmd)
@@ -401,4 +401,58 @@ func markSynced(ctx context.Context, rt *Runtime, src source.Source) {
 
 	// A failure here is not worth failing the run: the index is already correct.
 	_ = rt.Sources.Update(ctx, src)
+}
+
+// newReindexCommand rebuilds a library's vectors from scratch.
+//
+// It exists because an index is tied to the embedding model that wrote it.
+// Changing provider, model, or version means the stored vectors no longer belong
+// together, so the only safe repair is to discard them and re-ingest. That means
+// clearing the recorded identity first: without that, the ingest would refuse
+// for exactly the reason the user ran this command.
+func newReindexCommand(factory runtimeFactory) *cobra.Command {
+	d := &deps{factory: factory}
+
+	return &cobra.Command{
+		Use:   "reindex <name>",
+		Short: "Rebuild a library's vectors, for example after changing the embedding model",
+		Long: "Discard a library's indexed chunks and re-ingest it from scratch.\n\n" +
+			"Use this after changing embedding.provider or embedding.model. " +
+			"Ordinary updates should use `docmcp sync`, which embeds only what changed.",
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+
+			rt, err := d.open(ctx, cmd)
+			if err != nil {
+				return err
+			}
+			defer rt.Close()
+
+			src, err := findSource(ctx, rt, args[0])
+			if err != nil {
+				return err
+			}
+
+			out := cmd.OutOrStdout()
+
+			if err := rt.Ingestor.Remove(ctx, src.ID); err != nil {
+				return fmt.Errorf("clear chunks for %s: %w", src.LibraryID, err)
+			}
+			if err := rt.Store.SetIdentity(ctx, ""); err != nil {
+				return fmt.Errorf("clear index identity: %w", err)
+			}
+
+			fmt.Fprintf(out, "Rebuilding %s...\n", src.LibraryID)
+
+			report, err := rt.Ingestor.Ingest(ctx, src)
+			if err != nil {
+				return fmt.Errorf("reindex %s: %w", src.LibraryID, err)
+			}
+
+			markSynced(ctx, rt, src)
+			writeIngestReport(out, src.LibraryID, report)
+			return nil
+		},
+	}
 }

@@ -30,7 +30,8 @@ func TestRootCommand_ExposesTheAgreedCommands(t *testing.T) {
 
 	want := map[string]bool{
 		"add": true, "list": true, "info": true,
-		"sync": true, "remove": true, "search": true, "serve": true, "version": true,
+		"sync": true, "remove": true, "reindex": true,
+		"search": true, "serve": true, "version": true,
 	}
 
 	got := map[string]bool{}

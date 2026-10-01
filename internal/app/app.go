@@ -75,6 +75,7 @@ func NewRootCommand(version string, factory ...runtimeFactory) *cobra.Command {
 		newListCommand(build),
 		newInfoCommand(build),
 		newRemoveCommand(build),
+		newReindexCommand(build),
 		newSearchCommand(build),
 		newServeCommand(build, version),
 		newVersionCommand(version),
@@ -88,7 +89,7 @@ func newVersionCommand(version string) *cobra.Command {
 		Use:   "version",
 		Short: "Print the docmcp version",
 		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			_, err := fmt.Fprintln(cmd.OutOrStdout(), version)
 			return err
 		},

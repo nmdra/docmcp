@@ -29,3 +29,15 @@ func listChunks(t *testing.T, cfg config.Config) []store.Chunk {
 	}
 	return chunks
 }
+
+// openStore opens the index directly so a test can inspect or corrupt state the
+// CLI does not expose.
+func openStore(t *testing.T, cfg config.Config) *store.ChromaStore {
+	t.Helper()
+
+	st, err := store.NewChromaStore(t.Context(), store.ChromaConfig{Path: cfg.ChromaPath()})
+	if err != nil {
+		t.Fatalf("open index: %v", err)
+	}
+	return st
+}
