@@ -55,7 +55,7 @@ func (r *Resolver) SetIndexed(counts map[string]int) {
 
 // Resolve ranks libraries for a name and query. An exact library ID resolves to
 // itself and nothing else.
-func (r *Resolver) Resolve(ctx context.Context, libraryName, query string) ([]Match, error) {
+func (r *Resolver) Resolve(_ context.Context, libraryName, query string) ([]Match, error) {
 	name := strings.TrimSpace(libraryName)
 	if name == "" {
 		return nil, fmt.Errorf("resolve library: a library name is required")

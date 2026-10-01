@@ -34,7 +34,7 @@ func newServeCommand(factory runtimeFactory, version string) *cobra.Command {
 			"Only resolve-library-id and query-docs are exposed. Indexing and sync " +
 			"stay in the CLI.",
 		Args: cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runServe(cmd.Context(), cmd, factory, version)
 		},
 	}

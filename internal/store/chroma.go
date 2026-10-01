@@ -158,10 +158,7 @@ func (s *ChromaStore) GetChunk(ctx context.Context, id string) (Chunk, error) {
 		return Chunk{}, fmt.Errorf("chroma store: get chunk %q: %w", id, err)
 	}
 
-	chunks, err := chunksFromGet(result)
-	if err != nil {
-		return Chunk{}, err
-	}
+	chunks := chunksFromGet(result)
 	if len(chunks) == 0 {
 		return Chunk{}, fmt.Errorf("%w: %s", ErrChunkNotFound, id)
 	}
@@ -184,13 +181,10 @@ func (s *ChromaStore) ListChunks(ctx context.Context, filter ListFilter) ([]Chun
 			return nil, fmt.Errorf("chroma store: list chunks: %w", err)
 		}
 
-		chunks, err := chunksFromGet(page)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, chunks...)
+		pageChunks := chunksFromGet(page)
+		out = append(out, pageChunks...)
 
-		if len(chunks) < listPageSize {
+		if len(pageChunks) < listPageSize {
 			break
 		}
 	}
@@ -250,7 +244,7 @@ func (s *ChromaStore) SetIdentity(ctx context.Context, identity string) error {
 	return nil
 }
 
-func (s *ChromaStore) Identity(ctx context.Context) (string, error) {
+func (s *ChromaStore) Identity(_ context.Context) (string, error) {
 	metadata := s.collection.Metadata()
 	if metadata == nil {
 		return "", nil
@@ -313,7 +307,7 @@ func buildWhere(filter ListFilter) chroma.WhereClause {
 
 // chunksFromGet rebuilds chunks from a Get response, skipping rows with no ID so
 // a partially-populated page cannot produce a zero-keyed chunk.
-func chunksFromGet(result chroma.GetResult) ([]Chunk, error) {
+func chunksFromGet(result chroma.GetResult) []Chunk {
 	ids := result.GetIDs()
 	documents := result.GetDocuments()
 	metadatas := result.GetMetadatas()
@@ -330,7 +324,7 @@ func chunksFromGet(result chroma.GetResult) ([]Chunk, error) {
 		out = append(out, chunk)
 	}
 
-	return out, nil
+	return out
 }
 
 // resultsFromQuery flattens Chroma's query groups into a single result list.

@@ -184,7 +184,7 @@ func splitSections(markdown string) []section {
 		boundaries = append(boundaries, boundary{
 			start:   blockStart(source, h),
 			level:   h.Level,
-			heading: string(h.Text(source)),
+			heading: headingText(source, h),
 		})
 		return ast.WalkContinue, nil
 	})
@@ -258,6 +258,19 @@ func splitSections(markdown string) []section {
 	}
 
 	return sections
+}
+
+// headingText reads a heading's plain text from its own lines. goldmark's
+// Heading.Text is deprecated and would also lose inline formatting markers that
+// the heading path should not carry.
+func headingText(source []byte, h *ast.Heading) string {
+	lines := h.Lines()
+	if lines == nil || lines.Len() == 0 {
+		return ""
+	}
+
+	segment := lines.At(0)
+	return strings.TrimSpace(string(source[segment.Start:segment.Stop]))
 }
 
 // blockStart returns the byte offset where a heading's source line begins.

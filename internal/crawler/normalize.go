@@ -46,7 +46,7 @@ func NormalizeURL(raw string, base string, keep ...KeepQueryParams) (string, err
 
 	ref, err := url.Parse(raw)
 	if err != nil {
-		return "", fmt.Errorf("%w: %q: %v", ErrUnsupportedURL, raw, err)
+		return "", fmt.Errorf("%w: %q: %w", ErrUnsupportedURL, raw, err)
 	}
 
 	switch strings.ToLower(ref.Scheme) {
@@ -62,7 +62,7 @@ func NormalizeURL(raw string, base string, keep ...KeepQueryParams) (string, err
 	} else {
 		parsedBase, err := url.Parse(base)
 		if err != nil {
-			return "", fmt.Errorf("%w: bad base %q: %v", ErrUnsupportedURL, base, err)
+			return "", fmt.Errorf("%w: bad base %q: %w", ErrUnsupportedURL, base, err)
 		}
 		ref = parsedBase.ResolveReference(ref)
 	}

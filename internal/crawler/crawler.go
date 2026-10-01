@@ -279,11 +279,7 @@ func (c *Crawler) fetchRaw(ctx context.Context, raw string) ([]byte, error) {
 func (c *Crawler) loadRobots() {
 	c.robotsClient = &http.Client{Timeout: 10 * time.Second}
 
-	base, err := c.filter.baseURL()
-	if err != nil {
-		c.robots = &Robots{}
-		return
-	}
+	base := c.filter.baseURL()
 
 	resp, err := c.robotsClient.Get(base + "/robots.txt")
 	if err != nil {

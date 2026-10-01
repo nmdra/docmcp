@@ -174,7 +174,7 @@ func benchmarkRecall(engine *search.Engine, docs []benchmarkDoc, k int) float64 
 
 // benchmarkMRR is the mean reciprocal rank of the first relevant chunk, which is
 // what decides whether an agent reads the top result or keeps scrolling.
-func benchmarkMRR(engine *search.Engine, docs []benchmarkDoc) float64 {
+func benchmarkMRR(engine *search.Engine) float64 {
 	queries := benchmarkQueries()
 	if len(queries) == 0 {
 		return 0

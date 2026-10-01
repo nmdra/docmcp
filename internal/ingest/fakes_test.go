@@ -118,14 +118,6 @@ func (f *fakeStore) Identity(_ context.Context) (string, error) {
 
 func (f *fakeStore) Close() error { return nil }
 
-func (f *fakeStore) chunkIDs() []string {
-	out := make([]string, 0, len(f.upserted))
-	for _, c := range f.upserted {
-		out = append(out, c.ID)
-	}
-	return out
-}
-
 // fakeEmbedder counts calls, which is how the incremental-sync tests prove no
 // unnecessary work was done.
 type fakeEmbedder struct {

@@ -48,6 +48,15 @@ const (
 	ToolQueryDocs        = "query-docs"
 )
 
+// Argument names. These are the contract: a model reads them from the advertised
+// schema, so they are declared once and referenced rather than repeated as
+// string literals.
+const (
+	argLibraryID   = "libraryId"
+	argLibraryName = "libraryName"
+	argQuery       = "query"
+)
+
 // Options configures a server. The version is the only build-dependent value.
 type Options struct {
 	Version string
@@ -63,25 +72,24 @@ type Options struct {
 // answer instead of a validation error.
 var ArgumentAliases = map[string]string{
 	// query-docs: a model guessing the ID field.
-	"libraryID":  "libraryId",
-	"library_ID": "libraryId",
-	"sourceId":   "libraryId",
-	"sourceID":   "libraryId",
-	"source_id":  "libraryId",
+	"libraryID":  argLibraryID,
+	"library_ID": argLibraryID,
+	"sourceId":   argLibraryID,
+	"sourceID":   argLibraryID,
+	"source_id":  argLibraryID,
 
 	// Both tools: a model guessing the query field.
-	"userQuery":  "query",
-	"user_query": "query",
-	"q":          "query",
+	"userQuery":  argQuery,
+	"user_query": argQuery,
+	"q":          argQuery,
 }
 
 // NameAliases apply to resolve-library-id's libraryName field, which takes a
 // name rather than an ID. A model sending libraryID there means the same thing.
 var NameAliases = map[string]string{
-	"libraryID":   "libraryName",
-	"libraryId":   "libraryName",
-	"library":     "libraryName",
-	"libraryName": "libraryName",
+	"libraryID": argLibraryName,
+	"libraryId": argLibraryName,
+	"library":   argLibraryName,
 }
 
 // readOnlyAnnotations describes both tools. openWorldHint is false because a

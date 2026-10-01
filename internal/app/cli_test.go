@@ -104,20 +104,20 @@ const authHTML = `<!doctype html><html><head><title>Auth</title></head><body><ma
 
 // newTestCommand builds the CLI root against a temp data directory with a fake
 // embedder, so no test ever reads the user's config or index.
-func newTestCommand(t *testing.T) (*bytes.Buffer, config.Config) {
+func newTestCommand(t *testing.T) config.Config {
 	t.Helper()
 
 	cfg := config.Default()
 	cfg.Data.Path = t.TempDir()
 	cfg.Embedding.Provider = "fake"
 
-	return &bytes.Buffer{}, cfg
+	return cfg
 }
 
 func runRoot(t *testing.T, cfg config.Config, args ...string) (string, error) {
 	t.Helper()
 
-	return runRootWithConfig(t, cfg, configFileFor(t, cfg), args...)
+	return runRootWithConfig(t, cfg, configFileFor(t), args...)
 }
 
 // runRootWithConfig runs the CLI against an explicit config file. Indexing and
@@ -137,7 +137,7 @@ func runRootWithConfig(t *testing.T, cfg config.Config, configPath string, args 
 	return out.String(), err
 }
 
-func configFileFor(t *testing.T, cfg config.Config) string {
+func configFileFor(t *testing.T) string {
 	t.Helper()
 
 	path := filepath.Join(t.TempDir(), "config.toml")
@@ -149,7 +149,7 @@ func configFileFor(t *testing.T, cfg config.Config) string {
 }
 
 func TestAddCommand_RequiresURL(t *testing.T) {
-	_, cfg := newTestCommand(t)
+	cfg := newTestCommand(t)
 
 	_, err := runRoot(t, cfg, "add")
 	if err == nil {
@@ -162,7 +162,7 @@ func TestAddCommand_RequiresURL(t *testing.T) {
 
 func TestAddCommand_RequiresName(t *testing.T) {
 	site := newFixtureSite(t)
-	_, cfg := newTestCommand(t)
+	cfg := newTestCommand(t)
 
 	_, err := runRoot(t, cfg, "add", site.URL+"/docs/")
 	if err == nil {
@@ -175,7 +175,7 @@ func TestAddCommand_RequiresName(t *testing.T) {
 
 func TestAddCommand_Version(t *testing.T) {
 	site := newFixtureSite(t)
-	_, cfg := newTestCommand(t)
+	cfg := newTestCommand(t)
 
 	out, err := runRoot(t, cfg, "add", site.URL+"/docs/", "--name", "fixture", "--version", "1.0")
 	if err != nil {
@@ -189,7 +189,7 @@ func TestAddCommand_Version(t *testing.T) {
 
 func TestAddCommand_ReportsPageAndChunkCounts(t *testing.T) {
 	site := newFixtureSite(t)
-	_, cfg := newTestCommand(t)
+	cfg := newTestCommand(t)
 
 	out, err := runRoot(t, cfg, "add", site.URL+"/docs/", "--name", "fixture", "--version", "1.0")
 	if err != nil {
@@ -206,7 +206,7 @@ func TestAddCommand_ReportsPageAndChunkCounts(t *testing.T) {
 
 func TestAddCommand_WithoutVersion(t *testing.T) {
 	site := newFixtureSite(t)
-	_, cfg := newTestCommand(t)
+	cfg := newTestCommand(t)
 
 	out, err := runRoot(t, cfg, "add", site.URL+"/docs/", "--name", "fixture")
 	if err != nil {
@@ -220,7 +220,7 @@ func TestAddCommand_WithoutVersion(t *testing.T) {
 
 func TestAddCommand_Includes(t *testing.T) {
 	site := newFixtureSite(t)
-	_, cfg := newTestCommand(t)
+	cfg := newTestCommand(t)
 
 	out, err := runRoot(t, cfg,
 		"add", site.URL+"/docs/", "--name", "fixture", "--include", "/docs/api/**")
@@ -241,7 +241,7 @@ func TestAddCommand_Includes(t *testing.T) {
 
 func TestAddCommand_Excludes(t *testing.T) {
 	site := newFixtureSite(t)
-	_, cfg := newTestCommand(t)
+	cfg := newTestCommand(t)
 
 	out, err := runRoot(t, cfg,
 		"add", site.URL+"/docs/", "--name", "fixture", "--exclude", "/docs/auth")
@@ -258,7 +258,7 @@ func TestAddCommand_Excludes(t *testing.T) {
 
 func TestAddCommand_Duplicate(t *testing.T) {
 	site := newFixtureSite(t)
-	_, cfg := newTestCommand(t)
+	cfg := newTestCommand(t)
 
 	if _, err := runRoot(t, cfg, "add", site.URL+"/docs/", "--name", "fixture", "--version", "1"); err != nil {
 		t.Fatalf("first add: %v", err)
@@ -274,7 +274,7 @@ func TestAddCommand_Duplicate(t *testing.T) {
 }
 
 func TestAddCommand_RejectsNonHTTPURL(t *testing.T) {
-	_, cfg := newTestCommand(t)
+	cfg := newTestCommand(t)
 
 	for _, raw := range []string{"file:///etc/passwd", "ftp://example.com", "mailto:a@b.c"} {
 		if _, err := runRoot(t, cfg, "add", raw, "--name", "x"); err == nil {
@@ -284,7 +284,7 @@ func TestAddCommand_RejectsNonHTTPURL(t *testing.T) {
 }
 
 func TestListCommand_Empty(t *testing.T) {
-	_, cfg := newTestCommand(t)
+	cfg := newTestCommand(t)
 
 	out, err := runRoot(t, cfg, "list")
 	if err != nil {
@@ -297,7 +297,7 @@ func TestListCommand_Empty(t *testing.T) {
 
 func TestListCommand_MultipleLibraries(t *testing.T) {
 	site := newFixtureSite(t)
-	_, cfg := newTestCommand(t)
+	cfg := newTestCommand(t)
 
 	if _, err := runRoot(t, cfg, "add", site.URL+"/docs/", "--name", "alpha", "--version", "1"); err != nil {
 		t.Fatalf("add alpha: %v", err)
@@ -320,7 +320,7 @@ func TestListCommand_MultipleLibraries(t *testing.T) {
 
 func TestListCommand_Versions(t *testing.T) {
 	site := newFixtureSite(t)
-	_, cfg := newTestCommand(t)
+	cfg := newTestCommand(t)
 
 	for _, v := range []string{"1", "2"} {
 		if _, err := runRoot(t, cfg, "add", site.URL+"/docs/", "--name", "fixture", "--version", v); err != nil {
@@ -341,7 +341,7 @@ func TestListCommand_Versions(t *testing.T) {
 
 func TestInfoCommand_ShowsSourceDetail(t *testing.T) {
 	site := newFixtureSite(t)
-	_, cfg := newTestCommand(t)
+	cfg := newTestCommand(t)
 
 	if _, err := runRoot(t, cfg, "add", site.URL+"/docs/", "--name", "fixture", "--version", "1.0"); err != nil {
 		t.Fatalf("add: %v", err)
@@ -360,7 +360,7 @@ func TestInfoCommand_ShowsSourceDetail(t *testing.T) {
 }
 
 func TestInfoCommand_UnknownLibrary(t *testing.T) {
-	_, cfg := newTestCommand(t)
+	cfg := newTestCommand(t)
 
 	_, err := runRoot(t, cfg, "info", "/local/nope/1")
 	if err == nil {
@@ -370,7 +370,7 @@ func TestInfoCommand_UnknownLibrary(t *testing.T) {
 
 func TestRemoveCommand(t *testing.T) {
 	site := newFixtureSite(t)
-	_, cfg := newTestCommand(t)
+	cfg := newTestCommand(t)
 
 	if _, err := runRoot(t, cfg, "add", site.URL+"/docs/", "--name", "fixture", "--version", "1"); err != nil {
 		t.Fatalf("add: %v", err)
@@ -398,7 +398,7 @@ func TestRemoveCommand(t *testing.T) {
 }
 
 func TestRemoveCommand_UnknownSource(t *testing.T) {
-	_, cfg := newTestCommand(t)
+	cfg := newTestCommand(t)
 
 	if _, err := runRoot(t, cfg, "remove", "nope"); err == nil {
 		t.Error("remove of an unknown source succeeded, want error")
@@ -407,7 +407,7 @@ func TestRemoveCommand_UnknownSource(t *testing.T) {
 
 func TestSyncCommand_SkipsUnchangedWork(t *testing.T) {
 	site := newFixtureSite(t)
-	_, cfg := newTestCommand(t)
+	cfg := newTestCommand(t)
 
 	if _, err := runRoot(t, cfg, "add", site.URL+"/docs/", "--name", "fixture", "--version", "1"); err != nil {
 		t.Fatalf("add: %v", err)
@@ -433,7 +433,7 @@ func TestSyncCommand_SkipsUnchangedWork(t *testing.T) {
 
 func TestSyncCommand_PicksUpChangedPage(t *testing.T) {
 	site := newFixtureSite(t)
-	_, cfg := newTestCommand(t)
+	cfg := newTestCommand(t)
 
 	if _, err := runRoot(t, cfg, "add", site.URL+"/docs/", "--name", "fixture", "--version", "1"); err != nil {
 		t.Fatalf("add: %v", err)
@@ -462,7 +462,7 @@ func TestSyncCommand_PicksUpChangedPage(t *testing.T) {
 
 func TestSyncCommand_RemovesDeletedPage(t *testing.T) {
 	site := newFixtureSite(t)
-	_, cfg := newTestCommand(t)
+	cfg := newTestCommand(t)
 
 	if _, err := runRoot(t, cfg, "add", site.URL+"/docs/", "--name", "fixture", "--version", "1"); err != nil {
 		t.Fatalf("add: %v", err)
@@ -485,7 +485,7 @@ func TestSyncCommand_RemovesDeletedPage(t *testing.T) {
 }
 
 func TestSyncCommand_UnknownSource(t *testing.T) {
-	_, cfg := newTestCommand(t)
+	cfg := newTestCommand(t)
 
 	if _, err := runRoot(t, cfg, "sync", "nope"); err == nil {
 		t.Error("sync of an unknown source succeeded, want error")

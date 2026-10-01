@@ -10,11 +10,11 @@ import (
 	"github.com/docmcp/docmcp/internal/crawler"
 )
 
-func newFetcher(t *testing.T, limits crawler.FetchLimits) (*crawler.HTTPFetcher, *http.Client) {
+func newFetcher(t *testing.T, limits crawler.FetchLimits) *crawler.HTTPFetcher {
 	t.Helper()
 
 	client := &http.Client{Timeout: limits.Timeout}
-	return crawler.NewHTTPFetcher(client, limits), client
+	return crawler.NewHTTPFetcher(client, limits)
 }
 
 func TestFetcher_GET(t *testing.T) {
@@ -24,7 +24,7 @@ func TestFetcher_GET(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	f, _ := newFetcher(t, crawler.FetchLimits{Timeout: 5 * time.Second, MaxBodyBytes: 1 << 20})
+	f := newFetcher(t, crawler.FetchLimits{Timeout: 5 * time.Second, MaxBodyBytes: 1 << 20})
 
 	page, err := f.Fetch(t.Context(), srv.URL+"/docs/install")
 	if err != nil {
@@ -48,7 +48,7 @@ func TestFetcher_ContentType(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	f, _ := newFetcher(t, crawler.FetchLimits{Timeout: 5 * time.Second, MaxBodyBytes: 1 << 20})
+	f := newFetcher(t, crawler.FetchLimits{Timeout: 5 * time.Second, MaxBodyBytes: 1 << 20})
 
 	page, err := f.Fetch(t.Context(), srv.URL+"/feed")
 	if err != nil {
@@ -66,7 +66,7 @@ func TestFetcher_ETag(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	f, _ := newFetcher(t, crawler.FetchLimits{Timeout: 5 * time.Second, MaxBodyBytes: 1 << 20})
+	f := newFetcher(t, crawler.FetchLimits{Timeout: 5 * time.Second, MaxBodyBytes: 1 << 20})
 
 	page, err := f.Fetch(t.Context(), srv.URL+"/a")
 	if err != nil {
@@ -84,7 +84,7 @@ func TestFetcher_LastModified(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	f, _ := newFetcher(t, crawler.FetchLimits{Timeout: 5 * time.Second, MaxBodyBytes: 1 << 20})
+	f := newFetcher(t, crawler.FetchLimits{Timeout: 5 * time.Second, MaxBodyBytes: 1 << 20})
 
 	page, err := f.Fetch(t.Context(), srv.URL+"/a")
 	if err != nil {
@@ -106,7 +106,7 @@ func TestFetcher_ConditionalRequestReportsNotModified(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	f, _ := newFetcher(t, crawler.FetchLimits{Timeout: 5 * time.Second, MaxBodyBytes: 1 << 20})
+	f := newFetcher(t, crawler.FetchLimits{Timeout: 5 * time.Second, MaxBodyBytes: 1 << 20})
 
 	page, err := f.Fetch(t.Context(), srv.URL+"/a", crawler.WithValidators(`"abc123"`, ""))
 	if err != nil {
@@ -124,7 +124,7 @@ func TestFetcher_Timeout(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	f, _ := newFetcher(t, crawler.FetchLimits{Timeout: 50 * time.Millisecond, MaxBodyBytes: 1 << 20})
+	f := newFetcher(t, crawler.FetchLimits{Timeout: 50 * time.Millisecond, MaxBodyBytes: 1 << 20})
 
 	if _, err := f.Fetch(t.Context(), srv.URL+"/slow"); err == nil {
 		t.Error("Fetch succeeded past its timeout, want error")
@@ -137,7 +137,7 @@ func TestFetcher_404(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	f, _ := newFetcher(t, crawler.FetchLimits{Timeout: 5 * time.Second, MaxBodyBytes: 1 << 20})
+	f := newFetcher(t, crawler.FetchLimits{Timeout: 5 * time.Second, MaxBodyBytes: 1 << 20})
 
 	_, err := f.Fetch(t.Context(), srv.URL+"/missing")
 	if err == nil {
@@ -154,7 +154,7 @@ func TestFetcher_TooLarge(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	f, _ := newFetcher(t, crawler.FetchLimits{Timeout: 5 * time.Second, MaxBodyBytes: 1000})
+	f := newFetcher(t, crawler.FetchLimits{Timeout: 5 * time.Second, MaxBodyBytes: 1000})
 
 	if _, err := f.Fetch(t.Context(), srv.URL+"/big"); err == nil {
 		t.Error("Fetch of oversized body succeeded, want error")
@@ -169,7 +169,7 @@ func TestFetcher_Charset(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	f, _ := newFetcher(t, crawler.FetchLimits{Timeout: 5 * time.Second, MaxBodyBytes: 1 << 20})
+	f := newFetcher(t, crawler.FetchLimits{Timeout: 5 * time.Second, MaxBodyBytes: 1 << 20})
 
 	page, err := f.Fetch(t.Context(), srv.URL+"/latin")
 	if err != nil {
@@ -181,7 +181,7 @@ func TestFetcher_Charset(t *testing.T) {
 }
 
 func TestFetcher_RejectsNonHTTPURL(t *testing.T) {
-	f, _ := newFetcher(t, crawler.FetchLimits{Timeout: time.Second, MaxBodyBytes: 1 << 20})
+	f := newFetcher(t, crawler.FetchLimits{Timeout: time.Second, MaxBodyBytes: 1 << 20})
 
 	for _, raw := range []string{"file:///etc/passwd", "ftp://example.com/x", "mailto:a@b.c"} {
 		if _, err := f.Fetch(t.Context(), raw); err == nil {
@@ -203,7 +203,7 @@ func TestFetcher_DoesNotFollowRedirectOutsideHost(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
-	f, _ := newFetcher(t, crawler.FetchLimits{Timeout: 5 * time.Second, MaxBodyBytes: 1 << 20})
+	f := newFetcher(t, crawler.FetchLimits{Timeout: 5 * time.Second, MaxBodyBytes: 1 << 20})
 
 	if _, err := f.Fetch(t.Context(), srv.URL+"/redirect"); err == nil {
 		t.Error("cross-host redirect followed, want error")

@@ -149,8 +149,8 @@ func (m *memoryStore) CountChunks(_ context.Context, libraryID string) (int, err
 	return n, nil
 }
 
-func (m *memoryStore) Query(_ context.Context, q store.Query) ([]store.Result, error) {
-	chunks, err := m.ListChunks(context.Background(),
+func (m *memoryStore) Query(ctx context.Context, q store.Query) ([]store.Result, error) {
+	chunks, err := m.ListChunks(ctx,
 		store.ListFilter{LibraryID: q.LibraryID, Version: q.Version})
 	if err != nil {
 		return nil, err
@@ -158,11 +158,7 @@ func (m *memoryStore) Query(_ context.Context, q store.Query) ([]store.Result, e
 
 	results := rankChunks(chunks, q.Embedding, q.TopK)
 
-	out := make([]store.Result, 0, len(results))
-	for _, r := range results {
-		out = append(out, r)
-	}
-	return out, nil
+	return append([]store.Result(nil), results...), nil
 }
 
 func (m *memoryStore) Identity(context.Context) (string, error)  { return "", nil }

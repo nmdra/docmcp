@@ -34,10 +34,11 @@ type Service struct {
 
 const defaultBatchSize = 32
 
-type serviceOption func(*Service)
+// Option configures a Service.
+type Option func(*Service)
 
 // WithBatchSize sets how many texts go to the provider in one call.
-func WithBatchSize(n int) serviceOption {
+func WithBatchSize(n int) Option {
 	return func(s *Service) {
 		if n > 0 {
 			s.batch = n
@@ -45,7 +46,7 @@ func WithBatchSize(n int) serviceOption {
 	}
 }
 
-func NewService(embedder Embedder, opts ...serviceOption) *Service {
+func NewService(embedder Embedder, opts ...Option) *Service {
 	s := &Service{embedder: embedder, batch: defaultBatchSize}
 	for _, apply := range opts {
 		apply(s)

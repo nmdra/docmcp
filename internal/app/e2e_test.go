@@ -163,8 +163,8 @@ func TestEndToEnd_VersionIsolation(t *testing.T) {
 		},
 	} {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			switch {
-			case r.URL.Path == "/robots.txt":
+			switch r.URL.Path {
+			case "/robots.txt":
 				w.Write([]byte("User-agent: *\n"))
 			default:
 				w.Header().Set("Content-Type", "text/html; charset=utf-8")

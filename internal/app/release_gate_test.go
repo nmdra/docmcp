@@ -27,7 +27,7 @@ func TestFreshMachine_DefaultProviderWorksOffline(t *testing.T) {
 	// The default provider: no API key, no server.
 	cfg.Embedding.Provider = "default"
 
-	configPath := writeDefaultConfig(t, cfg.Data.Path)
+	configPath := writeDefaultConfig(t)
 
 	added, err := runRootWithConfig(t, cfg, configPath, "add", site.URL+"/docs/mcp",
 		"--name", "acme", "--version", "1.0")
@@ -107,7 +107,7 @@ func TestFreshMachine_SyncIsIncrementalWithRealEmbeddings(t *testing.T) {
 	}
 }
 
-func writeDefaultConfig(t *testing.T, dataDir string) string {
+func writeDefaultConfig(t *testing.T) string {
 	t.Helper()
 
 	path := filepath.Join(t.TempDir(), "config.toml")

@@ -225,7 +225,7 @@ func RunStoreContractTests(t *testing.T, create Factory) {
 		// hit is unambiguous whatever distance metric the store uses.
 		results, err := s.Query(ctx, store.Query{
 			LibraryID: "/local/acme/1",
-			Embedding: testVector("Bearer tokens authenticate every request.", 8),
+			Embedding: testVector("Bearer tokens authenticate every request."),
 			TopK:      3,
 		})
 		if err != nil {
@@ -243,7 +243,7 @@ func RunStoreContractTests(t *testing.T, create Factory) {
 		s := create(t)
 		ctx := t.Context()
 
-		vector := testVector("same text", 8)
+		vector := testVector("same text")
 		seed(t, s, []store.Chunk{
 			{ID: "mine", SourceID: "acme", LibraryID: "/local/acme/1",
 				Content: "same text", Embedding: vector},
@@ -277,14 +277,14 @@ func RunStoreContractTests(t *testing.T, create Factory) {
 				SourceID:  "acme",
 				LibraryID: "/local/acme/1",
 				Content:   "chunk",
-				Embedding: testVector(fmt.Sprintf("chunk %d", i), 8),
+				Embedding: testVector(fmt.Sprintf("chunk %d", i)),
 			})
 		}
 		seed(t, s, chunks)
 
 		results, err := s.Query(ctx, store.Query{
 			LibraryID: "/local/acme/1",
-			Embedding: testVector("chunk 5", 8),
+			Embedding: testVector("chunk 5"),
 			TopK:      3,
 		})
 		if err != nil {
@@ -301,7 +301,7 @@ func RunStoreContractTests(t *testing.T, create Factory) {
 
 		results, err := s.Query(ctx, store.Query{
 			LibraryID: "/local/nothing/9",
-			Embedding: testVector("anything", 8),
+			Embedding: testVector("anything"),
 			TopK:      5,
 		})
 		if err != nil {
@@ -449,7 +449,7 @@ func seed(t *testing.T, s store.Store, chunks []store.Chunk) {
 	vectors := make([][]float32, len(chunks))
 	for i, c := range chunks {
 		if len(c.Embedding) == 0 {
-			vectors[i] = testVector(c.Content, 8)
+			vectors[i] = testVector(c.Content)
 			continue
 		}
 		vectors[i] = c.Embedding
@@ -463,8 +463,11 @@ func seed(t *testing.T, s store.Store, chunks []store.Chunk) {
 // testVector maps text onto a stable unit-ish vector: identical text produces an
 // identical vector, and different text produces a different one, which is what
 // ranking assertions need.
-func testVector(text string, dim int) []float32 {
-	v := make([]float32, dim)
+// testVectorDim is fixed so every fixture in the contract shares one space.
+const testVectorDim = 8
+
+func testVector(text string) []float32 {
+	v := make([]float32, testVectorDim)
 
 	var sum int
 	for _, r := range text {

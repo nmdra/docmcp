@@ -52,12 +52,12 @@ func (r *Runtime) SearchEngine() (*search.Engine, error) {
 // Resolver returns a resolver over the given libraries, restricted to those
 // that actually have indexed content. Offering an empty library would send an
 // agent to a dead end.
-func (r *Runtime) Resolver(_ context.Context, libraries []source.Source) *search.Resolver {
+func (r *Runtime) Resolver(ctx context.Context, libraries []source.Source) *search.Resolver {
 	resolver := search.NewResolver(libraries)
 
 	indexed := map[string]int{}
 	for _, lib := range libraries {
-		if n, err := r.Store.CountChunks(context.Background(), lib.LibraryID); err == nil && n > 0 {
+		if n, err := r.Store.CountChunks(ctx, lib.LibraryID); err == nil && n > 0 {
 			indexed[lib.LibraryID] = n
 		}
 	}
@@ -275,9 +275,9 @@ func (f *fakeEmbedder) Embed(_ context.Context, texts []string) ([][]float32, er
 func (f *fakeEmbedder) vector(text string) []float32 {
 	v := make([]float32, f.dim)
 
+	dim := uint32(f.dim) // #nosec G115 -- dim is a small positive count, not user input
 	for _, word := range strings.Fields(strings.ToLower(text)) {
-		hash := fnv32(word)
-		v[hash%uint32(f.dim)] += 1
+		v[int(fnv32(word)%dim)]++
 	}
 
 	return normalize(v)

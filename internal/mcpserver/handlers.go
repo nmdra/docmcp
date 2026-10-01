@@ -20,13 +20,13 @@ import (
 // aliases without loosening validation.
 var (
 	resolveInputSchema = objectSchema(
-		property("libraryName", "the library, package, framework, CLI, or product name to resolve"),
-		property("query", "the user's question, used to rank matching libraries and versions"),
+		property(argLibraryName, "the library, package, framework, CLI, or product name to resolve"),
+		property(argQuery, "the user's question, used to rank matching libraries and versions"),
 	)
 
 	queryInputSchema = objectSchema(
-		property("libraryId", "an exact library ID from resolve-library-id, such as /local/pi/0.99.2"),
-		property("query", "one documentation concept to retrieve, described clearly"),
+		property(argLibraryID, "an exact library ID from resolve-library-id, such as /local/pi/0.99.2"),
+		property(argQuery, "one documentation concept to retrieve, described clearly"),
 	)
 )
 
@@ -63,7 +63,7 @@ func objectSchema(props ...propertySpec) map[string]any {
 }
 
 func (s *Server) handleResolve(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	name, query, err := readFields(req, "libraryName", "query")
+	name, query, err := readFields(req, argLibraryName, argQuery)
 	if err != nil {
 		return toolError(err)
 	}
@@ -77,7 +77,7 @@ func (s *Server) handleResolve(ctx context.Context, req *mcp.CallToolRequest) (*
 }
 
 func (s *Server) handleQuery(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	libraryID, query, err := readFields(req, "libraryId", "query")
+	libraryID, query, err := readFields(req, argLibraryID, argQuery)
 	if err != nil {
 		return toolError(err)
 	}

@@ -18,8 +18,6 @@ type benchmarkDoc struct {
 	md    string
 }
 
-const benchmarkLibrary = "bench"
-
 // benchmarkCorpus covers the topics the plan names. Each topic has several
 // chunks so ranking within a topic is actually exercised, not just
 // topic-identification.
@@ -206,9 +204,9 @@ func TestRetrievalBenchmark_RecallAt5(t *testing.T) {
 func TestRetrievalBenchmark_MRR(t *testing.T) {
 	requireLocalProvider(t)
 
-	engine, docs := benchmarkEngine(t)
+	engine, _ := benchmarkEngine(t)
 
-	mrr := benchmarkMRR(engine, docs)
+	mrr := benchmarkMRR(engine)
 	t.Logf("MRR = %.3f (floor %.2f)", mrr, mrrFloor)
 
 	if mrr < mrrFloor {

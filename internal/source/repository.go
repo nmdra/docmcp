@@ -29,7 +29,7 @@ type fileFormat struct {
 	Sources []Source `json:"sources"`
 }
 
-func (r *FileRepository) Add(ctx context.Context, src Source) (string, error) {
+func (r *FileRepository) Add(_ context.Context, src Source) (string, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -161,7 +161,7 @@ func (r *FileRepository) write(doc fileFormat) error {
 	}
 
 	tmp := r.path + ".tmp"
-	if err := os.WriteFile(tmp, append(data, '\n'), 0o644); err != nil {
+	if err := os.WriteFile(tmp, append(data, '\n'), 0o600); err != nil {
 		return fmt.Errorf("write sources: %w", err)
 	}
 	if err := os.Rename(tmp, r.path); err != nil {
