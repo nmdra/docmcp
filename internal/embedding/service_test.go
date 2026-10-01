@@ -157,12 +157,13 @@ func TestEmbeddingService_EmptyInputMakesNoCall(t *testing.T) {
 }
 
 func TestEmbeddingService_ReturnsDimensionMismatchError(t *testing.T) {
-	fake := NewFakeEmbedder(4)
-	fake.Err = errors.New("provider returned 8 dimensions")
+	// A provider that returns wrong-width vectors must be caught even when it
+	// reports success — that is the case that would corrupt an index.
+	wrongWidth := &wrongDimensionEmbedder{}
 
-	svc := embedding.NewService(fake)
+	svc := embedding.NewService(wrongWidth)
 
-	_, err := svc.Embed(t.Context(), []string{"a"})
+	_, err := svc.Embed(t.Context(), []string{"a", "b"})
 	if !errors.Is(err, embedding.ErrDimensionMismatch) {
 		t.Errorf("error = %v, want ErrDimensionMismatch", err)
 	}
@@ -228,6 +229,22 @@ func TestEmbeddingService_MismatchDetectedBetweenConfigs(t *testing.T) {
 		t.Error("SameConfig() = false for identical configuration, want true")
 	}
 }
+
+// wrongDimensionEmbedder reports success but returns 8-wide vectors while
+// claiming 4 dimensions.
+type wrongDimensionEmbedder struct{}
+
+func (w *wrongDimensionEmbedder) Embed(_ context.Context, texts []string) ([][]float32, error) {
+	out := make([][]float32, len(texts))
+	for i := range texts {
+		out[i] = make([]float32, 8)
+	}
+	return out, nil
+}
+func (w *wrongDimensionEmbedder) Name() string     { return "wrong" }
+func (w *wrongDimensionEmbedder) Model() string    { return "wrong-model" }
+func (w *wrongDimensionEmbedder) Provider() string { return "fake" }
+func (w *wrongDimensionEmbedder) Dimensions() int  { return 4 }
 
 // shortEmbedder returns fewer vectors than it was given, the way a misbehaving
 // provider would.
