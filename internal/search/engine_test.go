@@ -8,6 +8,9 @@ import (
 	"github.com/docmcp/docmcp/internal/store"
 )
 
+// vec turns a fixture vector into a slice, which is what a query carries.
+func vec(v [3]float32) []float32 { return v[:] }
+
 const libraryA = "/local/acme/1"
 const libraryB = "/local/beta/1"
 
@@ -66,7 +69,7 @@ func TestSearch_ReturnsRelevantChunks(t *testing.T) {
 	results, err := engine.Search(t.Context(), search.Request{
 		LibraryID:      libraryA,
 		Query:          "authentication tokens",
-		QueryEmbedding: [3]float32{0, 1, 0},
+		QueryEmbedding: vec([3]float32{0, 1, 0}),
 	})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
@@ -81,14 +84,14 @@ func TestSearch_ReturnsRelevantChunks(t *testing.T) {
 
 func TestSearch_DeduplicatesAdjacentChunks(t *testing.T) {
 	engine := newTestEngine(t,
-		chunk("c1", libraryA, "Same section text one.", [3]float32{0, 1, 0}),
-		chunk("c2", libraryA, "Same section text two.", [3]float32{0, 1, 0}),
-		chunk("c3", libraryA, "Same section text three.", [3]float32{0, 1, 0}),
+		chunk("c1", libraryA, "Same section text.", [3]float32{0, 1, 0}),
+		chunk("c2", libraryA, "Same section text.", [3]float32{0, 1, 0}),
+		chunk("c3", libraryA, "Same section text.", [3]float32{0, 1, 0}),
 	)
 
 	results, err := engine.Search(t.Context(), search.Request{
 		LibraryID:      libraryA,
-		QueryEmbedding: [3]float32{0, 1, 0},
+		QueryEmbedding: vec([3]float32{0, 1, 0}),
 	})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
@@ -112,7 +115,7 @@ func TestSearch_LimitsContextInternally(t *testing.T) {
 
 	results, err := engine.Search(t.Context(), search.Request{
 		LibraryID:      libraryA,
-		QueryEmbedding: [3]float32{0, 1, 0},
+		QueryEmbedding: vec([3]float32{0, 1, 0}),
 	})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
@@ -131,7 +134,7 @@ func TestSearch_PreservesSourceURLs(t *testing.T) {
 	engine := newTestEngine(t, chunk("c1", libraryA, "Some text.", [3]float32{0, 1, 0}))
 
 	results, err := engine.Search(t.Context(), search.Request{
-		LibraryID: libraryA, QueryEmbedding: [3]float32{0, 1, 0},
+		LibraryID: libraryA, QueryEmbedding: vec([3]float32{0, 1, 0}),
 	})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
@@ -153,7 +156,7 @@ func TestSearch_NoResults(t *testing.T) {
 	engine := newTestEngine(t, chunk("c1", libraryA, "Some text.", [3]float32{0, 1, 0}))
 
 	results, err := engine.Search(t.Context(), search.Request{
-		LibraryID: "/local/nothing/9", QueryEmbedding: [3]float32{0, 1, 0},
+		LibraryID: "/local/nothing/9", QueryEmbedding: vec([3]float32{0, 1, 0}),
 	})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
@@ -167,7 +170,7 @@ func TestSearch_RejectsUnknownLibrary(t *testing.T) {
 	engine := newTestEngine(t, chunk("c1", libraryA, "Some text.", [3]float32{0, 1, 0}))
 
 	_, err := engine.Search(t.Context(), search.Request{
-		LibraryID: "not-a-library-id", QueryEmbedding: [3]float32{0, 1, 0},
+		LibraryID: "not-a-library-id", QueryEmbedding: vec([3]float32{0, 1, 0}),
 	})
 	if err == nil {
 		t.Error("Search accepted a malformed library ID, want error")
@@ -207,7 +210,7 @@ func TestSearch_ScoreIsNotExposedToCallers(t *testing.T) {
 	engine := newTestEngine(t, chunk("c1", libraryA, "Some text.", [3]float32{0, 1, 0}))
 
 	results, err := engine.Search(t.Context(), search.Request{
-		LibraryID: libraryA, QueryEmbedding: [3]float32{0, 1, 0},
+		LibraryID: libraryA, QueryEmbedding: vec([3]float32{0, 1, 0}),
 	})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
@@ -227,7 +230,7 @@ func TestSearch_FormatProducesNeutralSections(t *testing.T) {
 	engine := newTestEngine(t, chunk("c1", libraryA, "Some text.", [3]float32{0, 1, 0}))
 
 	results, err := engine.Search(t.Context(), search.Request{
-		LibraryID: libraryA, QueryEmbedding: [3]float32{0, 1, 0},
+		LibraryID: libraryA, QueryEmbedding: vec([3]float32{0, 1, 0}),
 	})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
@@ -251,7 +254,7 @@ func TestSearch_FormatSeparatesChunks(t *testing.T) {
 	)
 
 	results, err := engine.Search(t.Context(), search.Request{
-		LibraryID: libraryA, QueryEmbedding: [3]float32{0, 1, 0},
+		LibraryID: libraryA, QueryEmbedding: vec([3]float32{0, 1, 0}),
 	})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
