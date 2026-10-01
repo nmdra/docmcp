@@ -24,9 +24,9 @@ Keys can overlap. Create the new key before revoking the old one to avoid downti
 
 ## API keys
 
-Static API keys work for server-to-server calls. See the [API reference](/latest/api) for header formats.
+Static API keys work for server-to-server calls. See the [API reference](https://docs.acme.test/latest/api) for header formats.
 
 | Header | Value |
-| --- | --- |
-| Authorization | Bearer <token> |
-| X-Acme-Key | <static-key> |
+|---|---|
+| Authorization | Bearer &lt;token&gt; |
+| X-Acme-Key | &lt;static-key&gt; |

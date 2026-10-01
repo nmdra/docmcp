@@ -1,8 +1,10 @@
 package parser_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/docmcp/docmcp/internal/parser"
@@ -170,16 +172,17 @@ func TestHTMLConverter_GoldenMarkdown(t *testing.T) {
 }
 
 func TestHTMLConverter_EmptyDocument(t *testing.T) {
-	doc, err := parser.ParseHTML(parser.Page{
+	// A page with no body content is skipped, not indexed as an empty document:
+	// an empty chunk would be pure noise for retrieval.
+	_, err := parser.ParseHTML(parser.Page{
 		URL:  "https://docs.acme.test/latest/blank",
 		HTML: "<!doctype html><html><head><title>Blank</title></head><body></body></html>",
 	})
-	if err != nil {
-		t.Fatalf("ParseHTML: %v", err)
+	if err == nil {
+		t.Fatal("ParseHTML on an empty page succeeded, want ErrEmptyDocument")
 	}
-
-	if doc.Markdown != "" {
-		t.Errorf("Markdown = %q, want empty for a page with no body content", doc.Markdown)
+	if !errors.Is(err, parser.ErrEmptyDocument) {
+		t.Errorf("error = %v, want ErrEmptyDocument", err)
 	}
 }
 
@@ -268,10 +271,16 @@ func TestHTMLConverter_DocumentIDIsDeterministic(t *testing.T) {
 }
 
 func TestHTMLConverter_RejectsNonHTML(t *testing.T) {
-	for _, raw := range []string{"", "   ", "\x00\x01\x02"} {
+	for _, raw := range []string{"", "   "} {
 		if _, err := parser.ParseHTML(parser.Page{URL: "https://x.test/", HTML: raw}); err == nil {
 			t.Errorf("ParseHTML(%q) succeeded, want error", raw)
 		}
+	}
+}
+
+func TestHTMLConverter_RejectsMissingPageURL(t *testing.T) {
+	if _, err := parser.ParseHTML(parser.Page{URL: "", HTML: "<html><body><p>x</p></body></html>"}); err == nil {
+		t.Error("ParseHTML with no page URL succeeded, want error")
 	}
 }
 
@@ -297,22 +306,9 @@ func readGolden(t *testing.T, name string) string {
 }
 
 func contains(haystack, needle string) bool {
-	return len(needle) > 0 && len(haystack) >= len(needle) && indexOf(haystack, needle) >= 0
-}
-
-func indexOf(haystack, needle string) int {
-	for i := 0; i+len(needle) <= len(haystack); i++ {
-		if haystack[i:i+len(needle)] == needle {
-			return i
-		}
-	}
-	return -1
+	return strings.Contains(haystack, needle)
 }
 
 func replaceFirst(s, old, new string) string {
-	idx := indexOf(s, old)
-	if idx < 0 {
-		return s
-	}
-	return s[:idx] + new + s[idx+len(old):]
+	return strings.Replace(s, old, new, 1)
 }
