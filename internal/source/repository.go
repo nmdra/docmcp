@@ -25,10 +25,6 @@ func NewFileRepository(path string) (*FileRepository, error) {
 	return &FileRepository{path: path}, nil
 }
 
-type persistedSource struct {
-	Source
-}
-
 type fileFormat struct {
 	Sources []Source `json:"sources"`
 }
