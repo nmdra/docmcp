@@ -53,6 +53,12 @@ func NewService(embedder Embedder, opts ...serviceOption) *Service {
 	return s
 }
 
+// Provider, Model, and Dimensions expose the underlying embedder so a service
+// can be handed to a caller that only needs the vector contract.
+func (s *Service) Provider() string { return s.embedder.Provider() }
+func (s *Service) Model() string    { return s.embedder.Model() }
+func (s *Service) Dimensions() int  { return s.embedder.Dimensions() }
+
 // Embed batches the texts and concatenates the results, preserving input order
 // so a caller can pair each vector back to its chunk.
 func (s *Service) Embed(ctx context.Context, texts []string) ([][]float32, error) {
