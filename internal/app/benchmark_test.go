@@ -109,6 +109,18 @@ func benchmarkCorpus() []benchmarkDoc {
 		{"database", "/docs/db/transactions", "Database > Transactions",
 			"# Database\n\n## Transactions\n\nWrap a write sequence in a transaction so a " +
 				"failure midway rolls back the whole change."},
+
+		{"mcp-tools", "/docs/mcp/tools", "MCP tools > query-docs",
+			"# MCP tools\n\n## query-docs\n\nCall `query-docs` with a library ID and a " +
+				"natural-language query to retrieve documentation. Call " +
+				"`resolve-library-id` first when the user has not supplied an exact ID."},
+		{"cli", "/docs/cli/add", "CLI > docmcp add",
+			"# CLI\n\n## docmcp add\n\nRun `docmcp add <url> --name <name>` to crawl a " +
+				"documentation website and add its pages to the local index."},
+		{"versions", "/docs/library/versions", "Libraries > Version-specific IDs",
+			"# Libraries\n\n## Version-specific IDs\n\nUse `/local/pi/0.99.2` to query " +
+				"that pinned documentation release. `/local/pi/current` selects the " +
+				"current indexed version instead."},
 	}
 }
 
@@ -130,7 +142,7 @@ type benchmarkQuery struct {
 // benchmarkQueries deliberately paraphrase rather than reuse chunk wording: a
 // benchmark whose queries copy the corpus verbatim would pass even with a
 // keyword matcher, and so would not detect a semantic regression.
-func benchmarkQueries() []benchmarkQuery {
+func baselineBenchmarkQueries() []benchmarkQuery {
 	return []benchmarkQuery{
 		// Queries whose vocabulary differs from the chunk they should find.
 		{"authenticate a caller without a browser", "authentication", "/docs/auth/oauth"},
@@ -174,18 +186,26 @@ func benchmarkQueries() []benchmarkQuery {
 	}
 }
 
-// benchmarkFloors are the agreed regression thresholds. They are set below the
-// measured baseline so they can actually be crossed: a floor the current code
-// clears by a wide margin is not a guard, it is decoration.
+func benchmarkQueries() []benchmarkQuery {
+	return append(baselineBenchmarkQueries(), []benchmarkQuery{
+		// Exact tool names, a CLI command, and version-specific behavior extend
+		// coverage beyond the generic API concepts above.
+		{"what does query-docs accept", "mcp-tools", "/docs/mcp/tools"},
+		{"index a documentation website from the command line", "cli", "/docs/cli/add"},
+		{"how do I query a pinned release instead of current", "versions", "/docs/library/versions"},
+	}...)
+}
+
+// benchmarkFloors preserve the pre-change synthetic baseline while applying
+// the proposed public-alpha recall and MRR gates.
 //
-// The measured baseline on all-MiniLM-L6-v2 is Recall@5 1.00 and MRR 0.86.
-//
-// Verified sensitivity: deliberately reversing the result order moves MRR to
-// 0.67 and changes the top hit, so the metric responds to ranking regressions
-// rather than merely reporting a number.
+// The original 38-query baseline on all-MiniLM-L6-v2 measured Recall@5 1.00 and
+// MRR 0.86. Deliberately reversing result order moved MRR to 0.67, confirming
+// that the metric detects ranking regressions rather than merely reporting a
+// number.
 const (
-	recallAt5Floor = 0.88
-	mrrFloor       = 0.75
+	recallAt5Floor = 1.00
+	mrrFloor       = 0.86
 )
 
 func TestRetrievalBenchmark_RecallAt5(t *testing.T) {
@@ -206,11 +226,32 @@ func TestRetrievalBenchmark_MRR(t *testing.T) {
 
 	engine, _ := benchmarkEngine(t)
 
-	mrr := benchmarkMRR(engine)
-	t.Logf("MRR = %.3f (floor %.2f)", mrr, mrrFloor)
+	mrr := benchmarkMRR(engine, benchmarkQueries())
+	baselineMRR := benchmarkMRR(engine, baselineBenchmarkQueries())
+	t.Logf("MRR = %.3f, original subset MRR = %.3f (floor %.2f)", mrr, baselineMRR, mrrFloor)
+	if baselineMRR < mrrFloor {
+		t.Errorf("original subset MRR = %.3f, below baseline %.2f", baselineMRR, mrrFloor)
+	}
 
 	if mrr < mrrFloor {
 		t.Errorf("MRR = %.3f, below the agreed floor %.2f", mrr, mrrFloor)
+	}
+}
+
+func TestRetrievalBenchmark_TopKAccuracy(t *testing.T) {
+	requireLocalProvider(t)
+
+	engine, _ := benchmarkEngine(t)
+	top1 := benchmarkGoldAccuracy(engine, 1)
+	top3 := benchmarkGoldAccuracy(engine, 3)
+	top5 := benchmarkGoldAccuracy(engine, 5)
+	t.Logf("Top-1 = %.3f, Top-3 = %.3f, Top-5 = %.3f", top1, top3, top5)
+
+	if top3 < 0.80 {
+		t.Errorf("Top-3 = %.3f, below the proposed floor 0.80", top3)
+	}
+	if top5 < 0.90 {
+		t.Errorf("Top-5 = %.3f, below the proposed floor 0.90", top5)
 	}
 }
 
@@ -258,5 +299,157 @@ func TestRetrievalBenchmark_IsDeterministic(t *testing.T) {
 					i, first[i].Chunk.ID, again[i].Chunk.ID)
 			}
 		}
+	}
+}
+
+type retrievalBenchmarkCase struct {
+	query           string
+	libraryID       string
+	expectedURLs    []string
+	expectedHeads   []string
+	expectedContent []string
+	baseline        bool
+}
+
+type retrievalBenchmarkMetrics struct {
+	Top1      float64
+	Top3      float64
+	Top5      float64
+	MRR       float64
+	RecallAt5 float64
+}
+
+func measureRetrievalBenchmark(
+	cases []retrievalBenchmarkCase,
+	resultsByQuery map[string][]headingHit,
+) retrievalBenchmarkMetrics {
+	if len(cases) == 0 {
+		return retrievalBenchmarkMetrics{}
+	}
+
+	var metrics retrievalBenchmarkMetrics
+	for _, tc := range cases {
+		hits := resultsByQuery[tc.query]
+		firstRelevantRank := 0
+		matchedURLs := make(map[string]struct{}, len(tc.expectedURLs))
+		for i, hit := range hits {
+			if benchmarkResultMatches(tc, hit) && firstRelevantRank == 0 {
+				firstRelevantRank = i + 1
+			}
+			if i >= 5 {
+				continue
+			}
+			for _, expectedURL := range tc.expectedURLs {
+				if hit.url == expectedURL && benchmarkHeadingMatches(tc, hit.heading) &&
+					benchmarkContentMatches(tc, hit.content) {
+					matchedURLs[expectedURL] = struct{}{}
+				}
+			}
+		}
+
+		if firstRelevantRank == 1 {
+			metrics.Top1++
+		}
+		if firstRelevantRank > 0 && firstRelevantRank <= 3 {
+			metrics.Top3++
+		}
+		if firstRelevantRank > 0 && firstRelevantRank <= 5 {
+			metrics.Top5++
+		}
+		if firstRelevantRank > 0 {
+			metrics.MRR += 1 / float64(firstRelevantRank)
+		}
+		if len(tc.expectedURLs) > 0 {
+			metrics.RecallAt5 += float64(len(matchedURLs)) / float64(len(tc.expectedURLs))
+		}
+	}
+
+	count := float64(len(cases))
+	metrics.Top1 /= count
+	metrics.Top3 /= count
+	metrics.Top5 /= count
+	metrics.MRR /= count
+	metrics.RecallAt5 /= count
+	return metrics
+}
+
+func benchmarkResultMatches(tc retrievalBenchmarkCase, hit headingHit) bool {
+	for _, expectedURL := range tc.expectedURLs {
+		if hit.url == expectedURL && benchmarkHeadingMatches(tc, hit.heading) &&
+			benchmarkContentMatches(tc, hit.content) {
+			return true
+		}
+	}
+	return false
+}
+
+func benchmarkHeadingMatches(tc retrievalBenchmarkCase, heading string) bool {
+	return benchmarkContainsAny(heading, tc.expectedHeads)
+}
+
+func benchmarkContentMatches(tc retrievalBenchmarkCase, content string) bool {
+	return benchmarkContainsAny(content, tc.expectedContent)
+}
+
+func benchmarkContainsAny(value string, expected []string) bool {
+	if len(expected) == 0 {
+		return true
+	}
+	for _, match := range expected {
+		if strings.Contains(strings.ToLower(value), strings.ToLower(match)) {
+			return true
+		}
+	}
+	return false
+}
+
+func TestRetrievalBenchmark_MetricsUseExpectedURLHeadingAndContent(t *testing.T) {
+	cases := []retrievalBenchmarkCase{
+		{
+			query:           "direct exposure",
+			libraryID:       "/local/pi/current",
+			expectedURLs:    []string{"https://pi.dev/docs/latest/mcp"},
+			expectedHeads:   []string{"Control tool exposure"},
+			expectedContent: []string{"direct"},
+		},
+		{
+			query:         "oauth",
+			libraryID:     "/local/pi/current",
+			expectedURLs:  []string{"https://pi.dev/docs/latest/mcp"},
+			expectedHeads: []string{"OAuth"},
+		},
+		{
+			query:        "slash commands",
+			libraryID:    "/local/pi/current",
+			expectedURLs: []string{"https://pi.dev/docs/latest/slash-commands"},
+		},
+	}
+	results := map[string][]headingHit{
+		"direct exposure": {
+			{heading: "Control tool exposure", url: "https://pi.dev/docs/latest/mcp", content: "MCP authentication settings."},
+			{heading: "Control tool exposure", url: "https://pi.dev/docs/latest/mcp", content: "Direct tools are exposed here."},
+		},
+		"oauth": {
+			{heading: "Authenticate with OAuth", url: "https://pi.dev/docs/latest/mcp", content: "OAuth configuration."},
+		},
+		"slash commands": {
+			{heading: "Text editing", url: "https://pi.dev/docs/latest/actions"},
+			{heading: "Actions", url: "https://pi.dev/docs/latest/actions"},
+			{heading: "Editor", url: "https://pi.dev/docs/latest/editor"},
+			{heading: "Commands", url: "https://pi.dev/docs/latest/commands"},
+			{heading: "Slash Commands", url: "https://pi.dev/docs/latest/slash-commands"},
+		},
+	}
+
+	got := measureRetrievalBenchmark(cases, results)
+	if got.Top1 != 1.0/3 || got.Top3 != 2.0/3 || got.Top5 != 1.0 {
+		t.Errorf("top-k accuracy = (%.3f, %.3f, %.3f), want (0.333, 0.667, 1.000)",
+			got.Top1, got.Top3, got.Top5)
+	}
+	if got.MRR < 0.566 || got.MRR > 0.567 {
+		t.Errorf("MRR = %.3f, want approximately 0.567", got.MRR)
+	}
+	if got.RecallAt5 != 1.0 {
+		t.Errorf("Recall@5 = %.3f, want 1.000", got.RecallAt5)
 	}
 }

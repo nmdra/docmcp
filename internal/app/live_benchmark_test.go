@@ -23,44 +23,89 @@ func TestLivePiBenchmark(t *testing.T) {
 	liveBenchmark(t)
 }
 
-// liveBenchmarkCases map a real question to the pi.dev section that answers it.
-// wantURL is the page; wantHeading must appear in a top-3 result for a pass.
-var liveBenchmarkCases = []struct {
-	query      string
-	wantURL    string
-	wantSubstr string
-}{
+// liveBenchmarkCases are declarative questions and relevance expectations for
+// the real pi.dev index. The set spans exact names, paraphrases, headings,
+// configuration, authentication, short identifiers, and multiword concepts.
+var liveBenchmarkCases = []retrievalBenchmarkCase{
 	{
-		query:      "How are MCP codemode tools discovered?",
-		wantURL:    "https://pi.dev/docs/latest/mcp",
-		wantSubstr: "Control tool exposure",
+		query:         "How are MCP codemode tools discovered?",
+		libraryID:     "/local/pi/current",
+		expectedURLs:  []string{"https://pi.dev/docs/latest/mcp"},
+		expectedHeads: []string{"Control tool exposure"},
+		baseline:      true,
 	},
 	{
-		query:      "How do I add a default tool?",
-		wantURL:    "https://pi.dev/docs/latest/settings",
-		wantSubstr: "Tools",
+		query:         "How do I add a default tool?",
+		libraryID:     "/local/pi/current",
+		expectedURLs:  []string{"https://pi.dev/docs/latest/settings"},
+		expectedHeads: []string{"Tools"},
+		baseline:      true,
 	},
 	{
-		query:      "How is OAuth configured for an MCP server?",
-		wantURL:    "https://pi.dev/docs/latest/mcp",
-		wantSubstr: "OAuth",
+		query:         "How is OAuth configured for an MCP server?",
+		libraryID:     "/local/pi/current",
+		expectedURLs:  []string{"https://pi.dev/docs/latest/mcp"},
+		expectedHeads: []string{"OAuth"},
+		baseline:      true,
 	},
 	{
-		query:      "How are MCP tools hidden from the model?",
-		wantURL:    "https://pi.dev/docs/latest/mcp",
-		wantSubstr: "exposure",
+		query:         "How are MCP tools hidden from the model?",
+		libraryID:     "/local/pi/current",
+		expectedURLs:  []string{"https://pi.dev/docs/latest/mcp"},
+		expectedHeads: []string{"exposure"},
+		baseline:      true,
 	},
 	{
 		// The `direct` row of the exposure table lives in the "Control tool
 		// exposure" section, so this query must surface that section.
-		query:      "How does direct MCP exposure work?",
-		wantURL:    "https://pi.dev/docs/latest/mcp",
-		wantSubstr: "Control tool exposure",
+		query:           "How does direct MCP exposure work?",
+		libraryID:       "/local/pi/current",
+		expectedURLs:    []string{"https://pi.dev/docs/latest/mcp"},
+		expectedHeads:   []string{"Control tool exposure"},
+		expectedContent: []string{"direct"},
+		baseline:        true,
 	},
 	{
-		query:      "How do I use slash commands in the editor?",
-		wantURL:    "https://pi.dev/docs/latest/slash-commands",
-		wantSubstr: "",
+		query:        "How do I use slash commands in the editor?",
+		libraryID:    "/local/pi/current",
+		expectedURLs: []string{"https://pi.dev/docs/latest/slash-commands"},
+		baseline:     true,
+	},
+	{
+		query:         "What does codemode exposure do?",
+		libraryID:     "/local/pi/current",
+		expectedURLs:  []string{"https://pi.dev/docs/latest/mcp"},
+		expectedHeads: []string{"Control tool exposure"},
+	},
+	{
+		query:         "How do I hide an MCP tool?",
+		libraryID:     "/local/pi/current",
+		expectedURLs:  []string{"https://pi.dev/docs/latest/mcp"},
+		expectedHeads: []string{"Control tool exposure"},
+	},
+	{
+		query:         "How is oauth.clientName configured?",
+		libraryID:     "/local/pi/current",
+		expectedURLs:  []string{"https://pi.dev/docs/latest/mcp"},
+		expectedHeads: []string{"OAuth"},
+	},
+	{
+		query:        "What slash commands are available?",
+		libraryID:    "/local/pi/current",
+		expectedURLs: []string{"https://pi.dev/docs/latest/slash-commands"},
+	},
+	{
+		query:         "How do I enable a tool by default?",
+		libraryID:     "/local/pi/current",
+		expectedURLs:  []string{"https://pi.dev/docs/latest/settings"},
+		expectedHeads: []string{"Tools"},
+	},
+	{
+		query:           "What does /reload do?",
+		libraryID:       "/local/pi/current",
+		expectedURLs:    []string{"https://pi.dev/docs/latest/slash-commands"},
+		expectedHeads:   []string{"Runtime and project"},
+		expectedContent: []string{"Reload keybindings"},
 	},
 }
 
@@ -74,16 +119,21 @@ func liveBenchmark(t *testing.T) {
 	dataDir := t.TempDir()
 	cfg := newTestCommand(t)
 	cfg.Data.Path = dataDir
-	// The synthetic benchmark uses the fake embedder for speed. This one has to
-	// use the real local model: a fake embedder's ranking says nothing about
-	// whether a real documentation site is findable, and would report a
-	// retrieval failure that is really a provider artefact.
+	// Both retrieval benchmarks use the real local model. A fake embedder's
+	// ranking says nothing about whether real documentation is findable.
 
 	// A config file with no embedding section at all selects the built-in local
 	// model, which is what a real user gets.
 	configPath := filepath.Join(t.TempDir(), "config.toml")
 	if err := os.WriteFile(configPath, []byte("[crawler]\nmax_pages = 400\n"), 0o600); err != nil {
 		t.Fatalf("write config: %v", err)
+	}
+
+	// A second configuration exposes the full candidate budget for diagnostics
+	// only. Quality metrics below still measure the normal result budget.
+	candidateConfigPath := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(candidateConfigPath, []byte("[search]\ncandidate_count = 20\nfinal_chunks = 20\n"), 0o600); err != nil {
+		t.Fatalf("write candidate config: %v", err)
 	}
 
 	start := time.Now()
@@ -93,27 +143,24 @@ func liveBenchmark(t *testing.T) {
 	}
 	t.Logf("crawl+index took %s", time.Since(start).Round(time.Millisecond))
 
-	top1, top3, top5 := 0, 0, 0
+	ranked := make(map[string][]headingHit, len(liveBenchmarkCases))
+	baselineCases, baselineTop5 := 0, 0
 	for _, tc := range liveBenchmarkCases {
-		results := searchHeadings(t, cfg, configPath, "pi", tc.query, 5)
+		results := searchHeadings(t, cfg, configPath, tc.libraryID, tc.query, 5)
+		ranked[tc.query] = results
 
 		rank := 0
-		for i, h := range results {
-			headingOK := tc.wantSubstr == "" ||
-				strings.Contains(strings.ToLower(h.heading), strings.ToLower(tc.wantSubstr))
-			if strings.Contains(h.url, tc.wantURL) && headingOK {
+		for i, hit := range results {
+			if benchmarkResultMatches(tc, hit) {
 				rank = i + 1
 				break
 			}
 		}
-
-		switch {
-		case rank == 1:
-			top1++
-		case rank >= 2 && rank <= 3:
-			top3++
-		case rank >= 4 && rank <= 5:
-			top5++
+		if tc.baseline {
+			baselineCases++
+			if rank > 0 && rank <= 5 {
+				baselineTop5++
+			}
 		}
 
 		status := "MISS"
@@ -126,57 +173,57 @@ func liveBenchmark(t *testing.T) {
 			status = "top-5"
 		}
 		t.Logf("%-7s rank=%d %q", status, rank, tc.query)
-		for i, h := range results {
+		if rank == 0 {
+			candidates := searchHeadings(t, cfg, candidateConfigPath, tc.libraryID, tc.query, 20)
+			candidateRank := 0
+			for i, hit := range candidates {
+				if benchmarkResultMatches(tc, hit) {
+					candidateRank = i + 1
+					break
+				}
+			}
+			t.Logf("candidate diagnostic: relevant rank=%d among %d candidates", candidateRank, len(candidates))
+		}
+		for i, hit := range results {
 			marker := "    "
 			if i+1 == rank {
 				marker = "-> "
 			}
-			t.Logf("      %s%d. [%s] %s", marker, i+1, h.heading, h.url)
+			t.Logf("      %s%d. [%s] %s", marker, i+1, hit.heading, hit.url)
 		}
 	}
 
-	n := len(liveBenchmarkCases)
-	t.Logf("live benchmark: top-1 %d/%d, top-3 %d/%d, top-5 %d/%d",
-		top1, n, top1+top3, n, top1+top3+top5, n)
+	metrics := measureRetrievalBenchmark(liveBenchmarkCases, ranked)
+	t.Logf("live benchmark: Top-1 %.1f%%, Top-3 %.1f%%, Top-5 %.1f%%, MRR %.3f, Recall@5 %.3f",
+		metrics.Top1*100, metrics.Top3*100, metrics.Top5*100, metrics.MRR, metrics.RecallAt5)
+	t.Logf("original live cases in Top-5: %d/%d", baselineTop5, baselineCases)
 
-	// A regression floor, not a quality claim. The synthetic benchmark holds the
-	// line at Recall@5 1.0; this one only has to notice if real-world chunking
-	// stops being findable at all.
-	//
-	// The floor is n-2 because two queries are known to miss, recorded rather
-	// than tuned away:
-	//
-	//   - "How does direct MCP exposure work?" reaches the right page but ranks
-	//     a neighbouring section first. The exposure table is in "Control tool
-	//     exposure"; the stronger lexical pull is "add servers from extensions".
-	//   - "How do I use slash commands in the editor?" misses entirely. The
-	//     page's descriptive text is a short intro chunk, and the per-command
-	//     tables dominate the page, so a question about using slash commands
-	//     does not lexically resemble the intro. Rephrasing to "slash commands
-	//     available in the current session" finds it at rank 1.
-	//
-	// Both are retrieval-quality findings, not indexing faults: the content is
-	// present and reachable. Fixing them means changing ranking, which needs its
-	// own justification against this benchmark.
-	const knownMisses = 2
-	if top1+top3+top5 < n-knownMisses {
-		t.Errorf("only %d of %d live queries found their section in the top 5 (floor allows %d known misses)",
-			top1+top3+top5, n, knownMisses)
+	if metrics.Top5 < 0.90 || metrics.Top3 < 0.80 {
+		t.Errorf("live quality gate failed: Top-5 %.3f (want >= .90), Top-3 %.3f (want >= .80)",
+			metrics.Top5, metrics.Top3)
+	}
+	// Preserve the improved original subset independently from new queries.
+	// Direct exposure remains a known miss requiring further ranking work.
+	const knownMisses = 1
+	if baselineCases == 0 || baselineTop5 < baselineCases-knownMisses {
+		t.Errorf("only %d of %d original live queries found their section in the top 5; want at least %d",
+			baselineTop5, baselineCases, baselineCases-knownMisses)
 	}
 }
 
 type headingHit struct {
 	heading string
 	url     string
+	content string
 }
 
 // searchHeadings runs a library-scoped search and reads back the ranked
 // headings the CLI printed.
-func searchHeadings(t *testing.T, cfg config.Config, configPath, lib, query string, limit int) []headingHit {
+func searchHeadings(t *testing.T, cfg config.Config, configPath, libraryID, query string, limit int) []headingHit {
 	t.Helper()
 
 	out, err := runRootWithConfig(t, cfg, configPath, "search", query,
-		"--library", "/local/"+lib+"/current")
+		"--library", libraryID)
 	if err != nil {
 		t.Fatalf("search %q: %v", query, err)
 	}
@@ -198,13 +245,15 @@ func searchHeadings(t *testing.T, cfg config.Config, configPath, lib, query stri
 			}
 			if strings.HasPrefix(line, "Source: ") {
 				hit.url = strings.TrimPrefix(line, "Source: ")
+				continue
+			}
+			if strings.HasPrefix(line, "Library: ") {
+				hit.content = strings.TrimSpace(strings.Join(lines[i+1:], "\n"))
 				break
 			}
-			if strings.HasPrefix(line, "## ") || strings.HasPrefix(line, "Library: ") {
-				// The chunk body has started; nothing after this is metadata.
+			if strings.HasPrefix(line, "## ") {
 				break
 			}
-			_ = i
 		}
 		if hit.heading != "" {
 			hits = append(hits, hit)

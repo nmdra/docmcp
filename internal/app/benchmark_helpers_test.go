@@ -8,6 +8,7 @@ import (
 
 	"github.com/docmcp/docmcp/internal/chunker"
 	"github.com/docmcp/docmcp/internal/embedding"
+	"github.com/docmcp/docmcp/internal/ingest"
 	"github.com/docmcp/docmcp/internal/search"
 	"github.com/docmcp/docmcp/internal/store"
 )
@@ -92,7 +93,9 @@ func benchmarkEngine(t *testing.T) (*search.Engine, []benchmarkDoc) {
 				Content:     c.Content,
 				ContentHash: c.ContentHash,
 			})
-			texts = append(texts, c.Content)
+			texts = append(texts, ingest.EmbeddingText(ingest.Chunk{
+				Title: c.Title, HeadingPath: c.HeadingPath, Content: c.Content,
+			}))
 		}
 	}
 
@@ -175,10 +178,28 @@ func benchmarkRecall(engine *search.Engine, docs []benchmarkDoc, k int) float64 
 	return float64(hit) / float64(len(queries))
 }
 
+// benchmarkGoldAccuracy measures answers on the declared gold page, rather
+// than crediting an arbitrary page within the same broad topic.
+func benchmarkGoldAccuracy(engine *search.Engine, k int) float64 {
+	queries := benchmarkQueries()
+	if len(queries) == 0 {
+		return 0
+	}
+	hitCount := 0
+	for _, q := range queries {
+		for _, result := range benchmarkHits(engine, q.text, k) {
+			if result.Chunk.URL == benchmarkHost+q.gold {
+				hitCount++
+				break
+			}
+		}
+	}
+	return float64(hitCount) / float64(len(queries))
+}
+
 // benchmarkMRR is the mean reciprocal rank of the first relevant chunk, which is
 // what decides whether an agent reads the top result or keeps scrolling.
-func benchmarkMRR(engine *search.Engine) float64 {
-	queries := benchmarkQueries()
+func benchmarkMRR(engine *search.Engine, queries []benchmarkQuery) float64 {
 	if len(queries) == 0 {
 		return 0
 	}

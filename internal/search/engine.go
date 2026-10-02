@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/docmcp/docmcp/internal/source"
@@ -18,7 +19,7 @@ var (
 // Options bound one retrieval. Both are internal: they never reach the MCP
 // surface, where the contract is two required fields and nothing else.
 type Options struct {
-	// CandidateCount is how many vector hits are pulled before deduplication.
+	// CandidateCount bounds each dense and lexical list before fusion.
 	CandidateCount int
 
 	// FinalChunks is how many chunks a single query returns.
@@ -30,7 +31,8 @@ func DefaultOptions() Options {
 }
 
 // Request is one retrieval. QueryEmbedding is optional: when absent the engine
-// embeds Query, which is what both callers want.
+// embeds Query. Explicit technical identifiers in Query enable local lexical
+// retrieval; ordinary text and embedding-only requests retain dense ranking.
 type Request struct {
 	LibraryID string
 	Query     string
@@ -113,7 +115,8 @@ func NewEngine(st store.Store, embedder Embedder, opts Options) (*Engine, error)
 func (e *Engine) Options() Options { return e.options }
 
 // Search retrieves the chunks most relevant to a query, restricted to one
-// library.
+// library and version. Queries with explicit technical identifiers fuse dense
+// and local lexical candidates before deduplication and diversification.
 func (e *Engine) Search(ctx context.Context, req Request) ([]Result, error) {
 	libraryID := strings.TrimSpace(req.LibraryID)
 	if libraryID == "" {
@@ -152,30 +155,143 @@ func (e *Engine) Search(ctx context.Context, req Request) ([]Result, error) {
 		return nil, fmt.Errorf("search: query %s: %w", libraryID, err)
 	}
 
-	return e.trim(toResults(results)), nil
+	ranked := toResults(results)
+	sort.SliceStable(ranked, func(i, j int) bool {
+		if ranked[i].Score == ranked[j].Score {
+			return ranked[i].Chunk.ID < ranked[j].Chunk.ID
+		}
+		return ranked[i].Score < ranked[j].Score
+	})
+	if query := strings.TrimSpace(req.Query); hasTechnicalIdentifier(query) {
+		chunks, err := e.store.ListChunks(ctx, store.ListFilter{
+			LibraryID: libraryID,
+			Version:   parsed.Version,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("search: lexical candidates %s: %w", libraryID, err)
+		}
+		lexical, err := lexicalCandidates(ctx, chunks, query, e.options.CandidateCount)
+		if err != nil {
+			return nil, fmt.Errorf("search: lexical candidates %s: %w", libraryID, err)
+		}
+		ranked = RRF(ranked, lexical)
+	}
+	trimmed := e.trim(ranked)
+	if err := ctx.Err(); err != nil {
+		return nil, fmt.Errorf("search: %w", err)
+	}
+	return trimmed, nil
 }
 
-// trim deduplicates near-identical chunks and trims to the final budget.
-// Deduplication is by normalized content: a section split across several chunks
-// would otherwise fill the whole answer with near-copies.
+// trim removes empty and duplicate content, then applies a soft cap to adjacent
+// chunks from the same section before trimming to the final budget. Exact content
+// duplicates are identified by normalized text.
+const maxChunksPerAdjacentRun = 2
+
+type adjacentGroup struct {
+	sourceID    string
+	documentID  string
+	headingPath string
+}
+
+type adjacentRun struct {
+	group      adjacentGroup
+	firstIndex int
+}
+
+type indexedResult struct {
+	resultIndex int
+	chunkIndex  int
+}
+
 func (e *Engine) trim(results []Result) []Result {
 	out := make([]Result, 0, len(results))
+	deferred := make([]Result, 0, len(results))
 	seen := make(map[string]bool, len(results))
+	keptPerRun := make(map[adjacentRun]int, len(results))
+	runs := adjacentRuns(results)
 
-	for _, r := range results {
+	for i, r := range results {
 		key := normalizeContent(r.Chunk.Content)
 		if key == "" || seen[key] {
 			continue
 		}
 		seen[key] = true
 
+		if run, ok := runs[i]; ok && keptPerRun[run] >= maxChunksPerAdjacentRun {
+			deferred = append(deferred, r)
+			continue
+		}
+		if run, ok := runs[i]; ok {
+			keptPerRun[run]++
+		}
+
 		out = append(out, r)
 		if len(out) >= e.options.FinalChunks {
-			break
+			return out
 		}
 	}
 
+	// Fill any unused slots only after distinct sections and documents had a
+	// chance to contribute. Content and metadata remain untouched.
+	for _, r := range deferred {
+		if len(out) >= e.options.FinalChunks {
+			break
+		}
+		out = append(out, r)
+	}
 	return out
+}
+
+// adjacentRuns identifies sequential chunk-index runs within one source,
+// document, and full heading path. Missing metadata and negative indexes bypass
+// structural suppression rather than accidentally grouping unrelated chunks.
+func adjacentRuns(results []Result) map[int]adjacentRun {
+	groups := make(map[adjacentGroup][]indexedResult)
+	for i, result := range results {
+		chunk := result.Chunk
+		if chunk.SourceID == "" || chunk.DocumentID == "" || chunk.HeadingPath == "" || chunk.Index < 0 {
+			continue
+		}
+		group := adjacentGroup{
+			sourceID: chunk.SourceID, documentID: chunk.DocumentID,
+			headingPath: chunk.HeadingPath,
+		}
+		groups[group] = append(groups[group], indexedResult{resultIndex: i, chunkIndex: chunk.Index})
+	}
+
+	runs := make(map[int]adjacentRun, len(results))
+	for group, indexes := range groups {
+		sort.Slice(indexes, func(i, j int) bool {
+			if indexes[i].chunkIndex == indexes[j].chunkIndex {
+				return indexes[i].resultIndex < indexes[j].resultIndex
+			}
+			return indexes[i].chunkIndex < indexes[j].chunkIndex
+		})
+
+		ambiguous := false
+		for i := 1; i < len(indexes); i++ {
+			if indexes[i].chunkIndex == indexes[i-1].chunkIndex {
+				ambiguous = true
+				break
+			}
+		}
+		if ambiguous {
+			// Duplicate positions are not reliable evidence of adjacency.
+			continue
+		}
+
+		firstIndex := 0
+		previousIndex := 0
+		for i, indexed := range indexes {
+			if i == 0 || indexed.chunkIndex > previousIndex+1 {
+				firstIndex = indexed.chunkIndex
+			}
+			runs[indexed.resultIndex] = adjacentRun{group: group, firstIndex: firstIndex}
+			previousIndex = indexed.chunkIndex
+		}
+	}
+	return runs
 }
 
 // toResults adapts the store's results to this package's, dropping nothing:

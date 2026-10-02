@@ -1,6 +1,7 @@
 package search_test
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -10,6 +11,19 @@ import (
 
 // vec turns a fixture vector into a slice, which is what a query carries.
 func vec(v [3]float32) []float32 { return v[:] }
+
+func positionedChunk(
+	id, documentID, headingPath string,
+	index int,
+	content string,
+	vector [3]float32,
+) store.Chunk {
+	c := chunk(id, libraryA, content, vector)
+	c.DocumentID = documentID
+	c.HeadingPath = headingPath
+	c.Index = index
+	return c
+}
 
 const libraryA = "/local/acme/1"
 const libraryB = "/local/beta/1"
@@ -83,10 +97,20 @@ func TestSearch_ReturnsRelevantChunks(t *testing.T) {
 }
 
 func TestSearch_DeduplicatesAdjacentChunks(t *testing.T) {
+	sectionChunk := func(id string, index int, heading, content string, offset float32) store.Chunk {
+		c := chunk(id, libraryA, content, [3]float32{offset, 1, 0})
+		c.DocumentID = "mcp-doc"
+		c.HeadingPath = heading
+		c.Index = index
+		return c
+	}
+
 	engine := newTestEngine(t,
-		chunk("c1", libraryA, "Same section text.", [3]float32{0, 1, 0}),
-		chunk("c2", libraryA, "Same section text.", [3]float32{0, 1, 0}),
-		chunk("c3", libraryA, "Same section text.", [3]float32{0, 1, 0}),
+		sectionChunk("run-0", 0, "MCP > Control tool exposure", "Direct tools are exposed here.", 0),
+		sectionChunk("run-1", 1, "MCP > Control tool exposure", "Tool exposure can be configured.", 0.1),
+		sectionChunk("run-2", 2, "MCP > Control tool exposure", "The third table row describes a tool.", 0.2),
+		sectionChunk("run-3", 3, "MCP > Control tool exposure", "The fourth table row describes a tool.", 0.3),
+		sectionChunk("overview", 4, "MCP > Overview", "MCP tools connect the editor to external systems.", 0.4),
 	)
 
 	results, err := engine.Search(t.Context(), search.Request{
@@ -97,8 +121,123 @@ func TestSearch_DeduplicatesAdjacentChunks(t *testing.T) {
 		t.Fatalf("Search: %v", err)
 	}
 
-	if len(results) > 2 {
-		t.Errorf("returned %d near-identical chunks, want them deduplicated", len(results))
+	wantIDs := []string{"run-0", "run-1", "overview", "run-2", "run-3"}
+	if len(results) != len(wantIDs) {
+		t.Fatalf("got %d results, want %d: %+v", len(results), len(wantIDs), results)
+	}
+	for i, want := range wantIDs {
+		if got := results[i].Chunk.ID; got != want {
+			t.Errorf("result %d = %q, want %q", i, got, want)
+		}
+	}
+}
+
+// A lower-ranked alternative makes unintended suppression visible: backfill
+// cannot hide it once the restrictive final budget has been filled.
+func assertOrderedChunkIDs(t *testing.T, results []search.Result, want ...string) {
+	t.Helper()
+	got := make([]string, len(results))
+	for i, result := range results {
+		got[i] = result.Chunk.ID
+	}
+	if !slices.Equal(got, want) {
+		t.Fatalf("ordered IDs = %v, want %v", got, want)
+	}
+}
+
+func TestSearch_PreservesDistinctSections(t *testing.T) {
+	engine, err := search.NewEngine(newMemoryStore(
+		positionedChunk("intro-0", "mcp-doc", "MCP > Overview", 0, "MCP overview first part.", [3]float32{0, 1, 0}),
+		positionedChunk("intro-1", "mcp-doc", "MCP > Overview", 1, "MCP overview second part.", [3]float32{0.1, 1, 0}),
+		positionedChunk("tools", "mcp-doc", "MCP > Tools", 2, "MCP tools.", [3]float32{0.2, 1, 0}),
+		positionedChunk("alternative", "other-doc", "Guide", 0, "Lower-ranked alternative.", [3]float32{0.3, 1, 0}),
+	), &fixedEmbedder{}, search.Options{CandidateCount: 20, FinalChunks: 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	results, err := engine.Search(t.Context(), search.Request{
+		LibraryID: libraryA, QueryEmbedding: vec([3]float32{0, 1, 0}),
+	})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	assertOrderedChunkIDs(t, results, "intro-0", "intro-1", "tools")
+}
+
+func TestSearch_DoesNotCollapseUnrelatedDocuments(t *testing.T) {
+	engine, err := search.NewEngine(newMemoryStore(
+		positionedChunk("doc-a-0", "document-a", "Guide > Overview", 0, "First document first part.", [3]float32{0, 1, 0}),
+		positionedChunk("doc-a-1", "document-a", "Guide > Overview", 1, "First document second part.", [3]float32{0.1, 1, 0}),
+		positionedChunk("doc-b", "document-b", "Guide > Overview", 2, "Second document.", [3]float32{0.2, 1, 0}),
+		positionedChunk("alternative", "other-doc", "Guide", 0, "Lower-ranked alternative.", [3]float32{0.3, 1, 0}),
+	), &fixedEmbedder{}, search.Options{CandidateCount: 20, FinalChunks: 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	results, err := engine.Search(t.Context(), search.Request{
+		LibraryID: libraryA, QueryEmbedding: vec([3]float32{0, 1, 0}),
+	})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	assertOrderedChunkIDs(t, results, "doc-a-0", "doc-a-1", "doc-b")
+}
+
+func TestSearch_DoesNotCollapseAcrossIndexGaps(t *testing.T) {
+	engine, err := search.NewEngine(newMemoryStore(
+		positionedChunk("index-0", "mcp-doc", "MCP > Overview", 0, "First part.", [3]float32{0, 1, 0}),
+		positionedChunk("index-1", "mcp-doc", "MCP > Overview", 1, "Second part.", [3]float32{0.1, 1, 0}),
+		positionedChunk("index-3", "mcp-doc", "MCP > Overview", 3, "Part after a gap.", [3]float32{0.2, 1, 0}),
+		positionedChunk("alternative", "other-doc", "Guide", 0, "Lower-ranked alternative.", [3]float32{0.3, 1, 0}),
+	), &fixedEmbedder{}, search.Options{CandidateCount: 20, FinalChunks: 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	results, err := engine.Search(t.Context(), search.Request{
+		LibraryID: libraryA, QueryEmbedding: vec([3]float32{0, 1, 0}),
+	})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	assertOrderedChunkIDs(t, results, "index-0", "index-1", "index-3")
+}
+
+func TestSearch_BackfillsWhenCandidatesOnlyShareOneRun(t *testing.T) {
+	engine := newTestEngine(t,
+		positionedChunk("part-0", "mcp-doc", "MCP > Overview", 0, "First part.", [3]float32{0, 1, 0}),
+		positionedChunk("part-1", "mcp-doc", "MCP > Overview", 1, "Second part.", [3]float32{0.1, 1, 0}),
+		positionedChunk("part-2", "mcp-doc", "MCP > Overview", 2, "Third part.", [3]float32{0.2, 1, 0}),
+		positionedChunk("part-3", "mcp-doc", "MCP > Overview", 3, "Fourth part.", [3]float32{0.3, 1, 0}),
+	)
+
+	results, err := engine.Search(t.Context(), search.Request{
+		LibraryID: libraryA, QueryEmbedding: vec([3]float32{0, 1, 0}),
+	})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	if len(results) != 4 {
+		t.Fatalf("returned %d chunks, want deferred chunks backfilled", len(results))
+	}
+}
+
+func TestSearch_OrdersEqualScoresByChunkID(t *testing.T) {
+	engine := newTestEngine(t,
+		chunk("c", libraryA, "Third.", [3]float32{0, 1, 0}),
+		chunk("a", libraryA, "First.", [3]float32{0, 1, 0}),
+		chunk("b", libraryA, "Second.", [3]float32{0, 1, 0}),
+	)
+
+	results, err := engine.Search(t.Context(), search.Request{
+		LibraryID: libraryA, QueryEmbedding: vec([3]float32{0, 1, 0}),
+	})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+	for i, want := range []string{"a", "b", "c"} {
+		if got := results[i].Chunk.ID; got != want {
+			t.Errorf("result %d = %q, want stable tie-break %q", i, got, want)
+		}
 	}
 }
 
