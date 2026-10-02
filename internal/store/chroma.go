@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -306,7 +307,7 @@ func chunkMetadata(c Chunk) chroma.DocumentMetadata {
 	metadata.SetString(metaTitle, c.Title)
 	metadata.SetString(metaHeadingPath, c.HeadingPath)
 	metadata.SetString(metaContentHash, c.ContentHash)
-	metadata.SetRaw(metaChunkIndex, int64(c.Index))
+	metadata.SetInt(metaChunkIndex, int64(c.Index))
 	return metadata
 }
 
@@ -439,5 +440,11 @@ func applyMetadata(chunk *Chunk, metadata chroma.DocumentMetadata) {
 	}
 	if v, ok := metadata.GetInt(metaChunkIndex); ok {
 		chunk.Index = int(v)
+	} else if v, ok := metadata.GetFloat(metaChunkIndex); ok {
+		// Embedded Chroma decodes JSON numbers as floats. Accept only whole
+		// values that fit a Go int, not truncated fractions or nonfinite values.
+		if index, err := strconv.Atoi(strconv.FormatFloat(v, 'f', -1, 64)); err == nil {
+			chunk.Index = index
+		}
 	}
 }

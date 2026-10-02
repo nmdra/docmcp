@@ -214,6 +214,7 @@ func RunStoreContractTests(t *testing.T, create Factory) {
 
 		seed(t, s, []store.Chunk{
 			{ID: "auth", SourceID: "acme", LibraryID: "/local/acme/1",
+				DocumentID: "api-doc", HeadingPath: "API > Authentication", Index: 7,
 				Content: "Bearer tokens authenticate every request."},
 			{ID: "routing", SourceID: "acme", LibraryID: "/local/acme/1",
 				Content: "Routes map request paths to handlers."},
@@ -236,6 +237,10 @@ func RunStoreContractTests(t *testing.T, create Factory) {
 		}
 		if results[0].Chunk.ID != "auth" {
 			t.Errorf("top hit = %q, want the nearest chunk by embedding distance", results[0].Chunk.ID)
+		}
+		got := results[0].Chunk
+		if got.DocumentID != "api-doc" || got.HeadingPath != "API > Authentication" || got.Index != 7 {
+			t.Errorf("query lost structural metadata: %+v", got)
 		}
 	})
 

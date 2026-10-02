@@ -79,6 +79,45 @@ func (r *Runtime) RequireIndexed(ctx context.Context, libraryID string) error {
 	return nil
 }
 
+// CheckReindexCompatibility prevents a source-scoped rebuild from recording a
+// new global identity while other sources retain incompatible vectors.
+func (r *Runtime) CheckReindexCompatibility(ctx context.Context, sourceID string) error {
+	identity, err := r.Store.Identity(ctx)
+	if err != nil {
+		return fmt.Errorf("read index identity: %w", err)
+	}
+	if identity == "" || ingest.EmbeddingIdentityCompatible(identity, r.Embedder) {
+		return nil
+	}
+	chunks, err := r.Store.ListChunks(ctx, store.ListFilter{})
+	if err != nil {
+		return fmt.Errorf("check shared index: %w", err)
+	}
+	for _, chunk := range chunks {
+		if chunk.SourceID != sourceID {
+			return fmt.Errorf("cannot migrate this library while other libraries use an incompatible index; " +
+				"rebuild all libraries in a fresh --data-dir, or remove the other libraries before reindexing")
+		}
+	}
+	return nil
+}
+
+// ClearReindexIdentity clears a single-source fingerprint after its chunks have
+// been removed. A shared index retains its actual width to prevent vector mixing.
+func (r *Runtime) ClearReindexIdentity(ctx context.Context) error {
+	chunks, err := r.Store.ListChunks(ctx, store.ListFilter{})
+	if err != nil {
+		return fmt.Errorf("check remaining index: %w", err)
+	}
+	if len(chunks) > 0 {
+		return nil
+	}
+	if err := r.Store.SetIdentity(ctx, ""); err != nil {
+		return fmt.Errorf("clear index identity: %w", err)
+	}
+	return nil
+}
+
 // Close releases the store. The CLI defers this once per run.
 func (r *Runtime) Close() error {
 	if r == nil || r.Store == nil {

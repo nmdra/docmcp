@@ -153,11 +153,9 @@ func newSyncCommand(factory runtimeFactory) *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("sync %s: %w", src.LibraryID, err)
 			}
-			// Sync does not roll the registration back: the library already
-			// existed and its indexed chunks are still there. An empty crawl is
-			// worth saying out loud — it usually means the site moved or the
-			// rules now exclude everything — but it is not a failure, and
-			// discarding a working index over one bad crawl would be worse.
+			// Sync retains the existing registration even when no pages remain.
+			// Reconciliation can remove its chunks, so report the actual count
+			// rather than implying that every empty crawl preserves content.
 			if report.PagesFetched == 0 {
 				kept := 0
 				if n, err := rt.Store.CountChunks(ctx, src.LibraryID); err == nil {
@@ -432,9 +430,9 @@ func markSynced(ctx context.Context, rt *Runtime, src source.Source) {
 //
 // It exists because an index is tied to the embedding model that wrote it.
 // Changing provider, model, or version means the stored vectors no longer belong
-// together, so the only safe repair is to discard them and re-ingest. That means
-// clearing the recorded identity first: without that, the ingest would refuse
-// for exactly the reason the user ran this command.
+// together, so the only safe repair is to discard them and re-ingest. A shared
+// index retains its compatible identity and actual width. A single-source index
+// can clear its identity after removing all vectors.
 func newReindexCommand(factory runtimeFactory) *cobra.Command {
 	d := &deps{factory: factory}
 
@@ -461,11 +459,14 @@ func newReindexCommand(factory runtimeFactory) *cobra.Command {
 
 			out := cmd.OutOrStdout()
 
+			if err := rt.CheckReindexCompatibility(ctx, src.ID); err != nil {
+				return err
+			}
 			if err := rt.Ingestor.Remove(ctx, src.ID); err != nil {
 				return fmt.Errorf("clear chunks for %s: %w", src.LibraryID, err)
 			}
-			if err := rt.Store.SetIdentity(ctx, ""); err != nil {
-				return fmt.Errorf("clear index identity: %w", err)
+			if err := rt.ClearReindexIdentity(ctx); err != nil {
+				return err
 			}
 
 			fmt.Fprintf(out, "Rebuilding %s...\n", src.LibraryID)

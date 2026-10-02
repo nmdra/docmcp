@@ -64,6 +64,63 @@ func (a chunkerAdapter) Chunk(doc ingest.Document, loc ingest.Locator) ([]ingest
 	return out, nil
 }
 
+func TestEmbeddingText_IncludesTitleAndHeadingPath(t *testing.T) {
+	chunk := ingest.Chunk{
+		Title:       "Pi Documentation",
+		HeadingPath: "MCP > Control tool exposure",
+		Content:     "Tools can be exposed directly.",
+	}
+
+	got := ingest.EmbeddingText(chunk)
+	want := "Pi Documentation\n\nMCP > Control tool exposure\n\n" + chunk.Content
+	if got != want {
+		t.Errorf("EmbeddingText() = %q, want %q", got, want)
+	}
+}
+
+func TestEmbeddingText_DeduplicatesRepeatedTitleAndHeading(t *testing.T) {
+	chunk := ingest.Chunk{
+		Title:       "Authentication > OAuth",
+		HeadingPath: "Authentication > OAuth",
+		Content:     "Exchange an authorization code.",
+	}
+
+	got := ingest.EmbeddingText(chunk)
+	want := "Authentication > OAuth\n\nExchange an authorization code."
+	if got != want {
+		t.Errorf("EmbeddingText() = %q, want duplicate metadata omitted: %q", got, want)
+	}
+}
+
+func TestEmbeddingText_DoesNotModifyStoredContent(t *testing.T) {
+	chunk := ingest.Chunk{
+		Title:       "Pi Documentation",
+		HeadingPath: "MCP > Control tool exposure",
+		Content:     "Tools can be exposed directly.",
+		ContentHash: "stable-hash",
+	}
+
+	_ = ingest.EmbeddingText(chunk)
+	if chunk.Content != "Tools can be exposed directly." || chunk.ContentHash != "stable-hash" {
+		t.Fatalf("embedding text changed stored chunk content: %+v", chunk)
+	}
+}
+
+func TestEmbeddingText_IsStable(t *testing.T) {
+	chunk := ingest.Chunk{
+		Title:       "Pi Documentation",
+		HeadingPath: "MCP > Control tool exposure",
+		Content:     "Tools can be exposed directly.",
+	}
+
+	first := ingest.EmbeddingText(chunk)
+	for range 3 {
+		if got := ingest.EmbeddingText(chunk); got != first {
+			t.Fatalf("EmbeddingText changed between calls: %q then %q", first, got)
+		}
+	}
+}
+
 func TestIngestor_AddWebsite(t *testing.T) {
 	st := newFakeStore()
 	emb := newFakeEmbedder()
@@ -146,6 +203,34 @@ func TestIngestor_StoresMetadata(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("no chunk carried heading path %q; got %+v", "API > Authentication", st.upserted)
+	}
+}
+
+func TestIngestor_ReembedsWhenTitleChangesWithoutBodyChanges(t *testing.T) {
+	pages := []ingest.Page{page("https://docs.acme.test/api", docA)}
+	st := newFakeStore()
+	if _, err := newIngestor(t, pages, st, newFakeEmbedder()).Ingest(t.Context(), testSource()); err != nil {
+		t.Fatalf("initial Ingest: %v", err)
+	}
+
+	// Seed a previous title while keeping the IDs, body, and content hash fixed.
+	for id, saved := range st.existing {
+		saved.Title = "Previous document title"
+		st.existing[id] = saved
+	}
+	st.upserted = nil
+	emb := newFakeEmbedder()
+	report, err := newIngestor(t, pages, st, emb).Ingest(t.Context(), testSource())
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	if emb.embeddedCount() == 0 || report.ChunksUpdated == 0 {
+		t.Fatalf("title changed but chunks were not reembedded: %+v", report)
+	}
+	for _, saved := range st.upserted {
+		if saved.Title != "doc" {
+			t.Errorf("stored title = %q, want current title", saved.Title)
+		}
 	}
 }
 
@@ -390,9 +475,26 @@ func TestIngestor_RefusesWhenEmbeddingModelChanged(t *testing.T) {
 	}
 }
 
-func TestIngestor_AllowsSameEmbeddingModel(t *testing.T) {
+func TestIngestor_RefusesLegacyEmbeddingTextFormat(t *testing.T) {
 	st := newFakeStore()
 	st.identity = "fake/fake-model/4"
+
+	ing := newIngestor(t, []ingest.Page{
+		page("https://docs.acme.test/api", docA),
+	}, st, newFakeEmbedder())
+
+	_, err := ing.Ingest(t.Context(), testSource())
+	if err == nil || !strings.Contains(err.Error(), "reindex") {
+		t.Fatalf("Ingest error = %v, want an error directing the user to reindex", err)
+	}
+	if len(st.upserted) != 0 {
+		t.Errorf("wrote %d chunks using a mixed embedding-text format, want 0", len(st.upserted))
+	}
+}
+
+func TestIngestor_AllowsSameEmbeddingModel(t *testing.T) {
+	st := newFakeStore()
+	st.identity = "fake/fake-model/4/title-heading-v1"
 
 	ing := newIngestor(t, []ingest.Page{
 		page("https://docs.acme.test/api", docA),
@@ -518,6 +620,17 @@ func TestIngestor_StoresChunkWithVectorFromEmbedder(t *testing.T) {
 		t.Fatalf("Ingest: %v", err)
 	}
 
+	if len(emb.calls) != 1 || len(emb.calls[0]) != len(st.upserted) {
+		t.Fatalf("embedder calls = %#v for %d stored chunks", emb.calls, len(st.upserted))
+	}
+	for i, saved := range st.upserted {
+		for _, part := range []string{saved.Title, saved.HeadingPath, saved.Content} {
+			if !strings.Contains(emb.calls[0][i], part) {
+				t.Errorf("embedding text %q does not include chunk field %q", emb.calls[0][i], part)
+			}
+		}
+	}
+
 	saved := st.upserted[0]
 	got, err := st.GetChunk(t.Context(), saved.ID)
 	if err != nil {
@@ -532,3 +645,76 @@ func TestIngestor_StoresChunkWithVectorFromEmbedder(t *testing.T) {
 }
 
 var _ store.Store = (*fakeStore)(nil)
+
+// unknownWidthEmbedder models providers whose width is learned from output.
+type unknownWidthEmbedder struct{ *fakeEmbedder }
+
+func (unknownWidthEmbedder) Dimensions() int { return 0 }
+
+func unknownWidthIngestor(t *testing.T, pages []ingest.Page, st *fakeStore, width int) *ingest.Ingestor {
+	t.Helper()
+	svc, err := ingest.New(&fakeCrawler{pages: pages}, &fakeParser{}, newChunker(),
+		unknownWidthEmbedder{&fakeEmbedder{dim: width}}, chunkSink{st})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return svc
+}
+
+func TestIngestor_UnknownWidthPersistsActualIdentityAndKeepsItOnUnchangedSync(t *testing.T) {
+	st := newFakeStore()
+	pages := []ingest.Page{page("https://docs.acme.test/api", docA)}
+	if _, err := unknownWidthIngestor(t, pages, st, 4).Ingest(t.Context(), testSource()); err != nil {
+		t.Fatal(err)
+	}
+	const want = "fake/fake-model/4/title-heading-v1"
+	if st.identity != want {
+		t.Fatalf("identity = %q, want %q", st.identity, want)
+	}
+	st.upserted = nil
+	if _, err := unknownWidthIngestor(t, pages, st, 6).Ingest(t.Context(), testSource()); err != nil {
+		t.Fatal(err)
+	}
+	if st.identity != want || len(st.upserted) != 0 {
+		t.Fatalf("unchanged sync identity = %q, writes = %d", st.identity, len(st.upserted))
+	}
+}
+
+func TestIngestor_UnknownWidthDriftRefusesAllMutations(t *testing.T) {
+	st := newFakeStore()
+	pages := []ingest.Page{page("https://docs.acme.test/api", docA), page("https://docs.acme.test/requests", docB)}
+	if _, err := unknownWidthIngestor(t, pages, st, 4).Ingest(t.Context(), testSource()); err != nil {
+		t.Fatal(err)
+	}
+	st.upserted = nil
+	changed := []ingest.Page{page("https://docs.acme.test/api", "# API\n\nChanged content.")}
+	_, err := unknownWidthIngestor(t, changed, st, 6).Ingest(t.Context(), testSource())
+	if err == nil || !strings.Contains(err.Error(), "reindex") {
+		t.Fatalf("error = %v, want reindex guidance", err)
+	}
+	if len(st.upserted) != 0 || len(st.deleted) != 0 || st.identity != "fake/fake-model/4/title-heading-v1" {
+		t.Fatalf("drift mutated index: writes=%d deletes=%d identity=%q", len(st.upserted), len(st.deleted), st.identity)
+	}
+}
+
+func TestIngestor_UnknownWidthRefusesUnprovenIdentities(t *testing.T) {
+	for _, identity := range []string{
+		"fake/fake-model/0/title-heading-v1",
+		"fake/fake-model/4",
+		"fake/fake-model/4/body-only",
+		"fake/foreign-model/4/title-heading-v1",
+		"foreign/fake-model/4/title-heading-v1",
+	} {
+		t.Run(identity, func(t *testing.T) {
+			st := newFakeStore()
+			st.identity = identity
+			_, err := unknownWidthIngestor(t, []ingest.Page{page("https://docs.acme.test/api", docA)}, st, 4).Ingest(t.Context(), testSource())
+			if err == nil || !strings.Contains(err.Error(), "reindex") {
+				t.Fatalf("error = %v, want reindex guidance", err)
+			}
+			if len(st.upserted) != 0 || st.identity != identity {
+				t.Fatal("refusal mutated index")
+			}
+		})
+	}
+}

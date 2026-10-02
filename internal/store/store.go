@@ -31,8 +31,8 @@ type Chunk struct {
 
 	ContentHash string
 
-	// Embedding is the vector for Content. It is carried alongside the chunk so
-	// the ingestion service can stage a chunk before the embedder has run.
+	// Embedding is the vector produced from the configured embedding text. It is
+	// carried alongside the chunk so ingestion can stage a chunk before embedding.
 	Embedding []float32
 }
 

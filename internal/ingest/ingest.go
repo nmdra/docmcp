@@ -7,7 +7,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 
+	"github.com/docmcp/docmcp/internal/embedding"
 	"github.com/docmcp/docmcp/internal/source"
 )
 
@@ -35,6 +38,10 @@ type Document struct {
 	ContentHash  string
 }
 
+// embeddingTextVersion changes when the text representation sent to the embedder
+// changes. Indexes with another representation must be reindexed before sync.
+const embeddingTextVersion = "title-heading-v1"
+
 // Chunk is one retrievable section of a document.
 type Chunk struct {
 	ID        string
@@ -50,6 +57,22 @@ type Chunk struct {
 	Index       int
 	Content     string
 	ContentHash string
+}
+
+// EmbeddingText adds document context to a chunk for vector generation only.
+// The returned text is not stored or exposed in search results.
+func EmbeddingText(chunk Chunk) string {
+	if strings.EqualFold(strings.TrimSpace(chunk.Title), strings.TrimSpace(chunk.HeadingPath)) {
+		chunk.HeadingPath = ""
+	}
+
+	parts := make([]string, 0, 3)
+	for _, part := range []string{chunk.Title, chunk.HeadingPath, chunk.Content} {
+		if strings.TrimSpace(part) != "" {
+			parts = append(parts, part)
+		}
+	}
+	return strings.Join(parts, "\n\n")
 }
 
 // Locator binds chunks to the library being indexed.
@@ -212,7 +235,8 @@ func (i *Ingestor) Ingest(ctx context.Context, src source.Source) (Report, error
 			seen[c.ID] = true
 
 			previous, found := existingByID[c.ID]
-			if found && previous.ContentHash == c.ContentHash {
+			if found && previous.ContentHash == c.ContentHash &&
+				previous.Title == c.Title && previous.HeadingPath == c.HeadingPath {
 				report.ChunksUnchanged++
 				continue
 			}
@@ -235,9 +259,23 @@ func (i *Ingestor) Ingest(ctx context.Context, src source.Source) (Report, error
 	}
 	report.ChunksRemoved = len(removed)
 
+	dimensions := i.embedder.Dimensions()
+	if identity != "" && dimensions == 0 {
+		dimensions, _ = identityDimensions(identity, i.embedder)
+	}
 	vectors, err := i.embedAll(ctx, toEmbed)
 	if err != nil {
 		return report, err
+	}
+
+	// Validate the complete batch against the persisted width before any mutation.
+	for _, vector := range vectors {
+		if err := embedding.ValidateEmbedding(vector, dimensions); err != nil {
+			return report, fmt.Errorf("ingest: index embedding width is incompatible: %w; run docmcp reindex (use a fresh --data-dir for a shared index)", err)
+		}
+		if dimensions == 0 {
+			dimensions = len(vector)
+		}
 	}
 
 	if len(toWrite) > 0 {
@@ -253,8 +291,12 @@ func (i *Ingestor) Ingest(ctx context.Context, src source.Source) (Report, error
 		}
 	}
 
-	if err := i.chunks.SetIdentity(ctx, i.identity()); err != nil {
-		return report, fmt.Errorf("ingest: record index identity: %w", err)
+	// An empty unknown-width run cannot establish an embedding fingerprint.
+	if identity == "" && dimensions > 0 {
+		identity = embeddingIdentity(i.embedder, dimensions)
+		if err := i.chunks.SetIdentity(ctx, identity); err != nil {
+			return report, fmt.Errorf("ingest: record index identity: %w", err)
+		}
 	}
 
 	return report, nil
@@ -291,7 +333,7 @@ func (i *Ingestor) embedAll(ctx context.Context, chunks []Chunk) ([][]float32, e
 
 	texts := make([]string, len(chunks))
 	for n, c := range chunks {
-		texts[n] = c.Content
+		texts[n] = EmbeddingText(c)
 	}
 
 	vectors, err := i.embedder.Embed(ctx, texts)
@@ -308,12 +350,18 @@ func (i *Ingestor) embedAll(ctx context.Context, chunks []Chunk) ([][]float32, e
 // identity is the fingerprint persisted with the index. One embedding model per
 // index: a change here must force a reindex rather than mix vector spaces.
 func (i *Ingestor) identity() string {
-	return fmt.Sprintf("%s/%s/%d", i.embedder.Provider(), i.embedder.Model(), i.embedder.Dimensions())
+	return EmbeddingIdentity(i.embedder)
+}
+
+// EmbeddingIdentity identifies both the model and its chunk-text representation.
+// Application services use it before clearing an index identity for reindexing.
+func EmbeddingIdentity(embedder Embedder) string {
+	return embeddingIdentity(embedder, embedder.Dimensions())
 }
 
 // checkIdentity refuses to write into an index built by a different model.
 func (i *Ingestor) checkIdentity(existing string) error {
-	if existing == "" || existing == i.identity() {
+	if existing == "" || EmbeddingIdentityCompatible(existing, i.embedder) {
 		return nil
 	}
 
@@ -323,4 +371,29 @@ func (i *Ingestor) checkIdentity(existing string) error {
 			"Configured:\n  %s\n\n"+
 			"Run:\n  docmcp reindex",
 		existing, i.identity())
+}
+
+func embeddingIdentity(embedder Embedder, dimensions int) string {
+	return fmt.Sprintf("%s/%s/%d/%s", embedder.Provider(), embedder.Model(), dimensions, embeddingTextVersion)
+}
+
+// EmbeddingIdentityCompatible requires the same provider, model, and text format.
+// An unknown configured width accepts only a recorded positive actual width.
+func EmbeddingIdentityCompatible(existing string, embedder Embedder) bool {
+	if embedder.Dimensions() != 0 {
+		return existing == EmbeddingIdentity(embedder)
+	}
+	dimensions, ok := identityDimensions(existing, embedder)
+	return ok && dimensions > 0
+}
+
+func identityDimensions(identity string, embedder Embedder) (int, bool) {
+	prefix := embedder.Provider() + "/" + embedder.Model() + "/"
+	suffix := "/" + embeddingTextVersion
+	if !strings.HasPrefix(identity, prefix) || !strings.HasSuffix(identity, suffix) {
+		return 0, false
+	}
+	width := strings.TrimSuffix(strings.TrimPrefix(identity, prefix), suffix)
+	dimensions, err := strconv.Atoi(width)
+	return dimensions, err == nil && width == strconv.Itoa(dimensions)
 }
