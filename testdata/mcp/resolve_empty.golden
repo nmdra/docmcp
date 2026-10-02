@@ -1,0 +1,3 @@
+No indexed libraries match that name.
+
+Run `docmcp list` to see what is indexed, or `docmcp add <url> --name <name>` to index one.

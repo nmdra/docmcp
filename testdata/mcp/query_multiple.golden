@@ -1,0 +1,30 @@
+### MCP > Control tool exposure
+
+Source: https://pi.dev/docs/latest/mcp
+Library: /local/pi/0.99.2
+
+MCP servers using codemode exposure discover tools lazily.
+
+Use `exposure: codemode` to enable this behavior.
+
+---
+
+### Pi settings
+
+Source: https://pi.dev/docs/latest/settings
+Library: /local/pi/0.99.2
+
+Configure enabled tools in settings.
+
+```json
+{"enabled": true}
+```
+
+---
+
+### https://pi.dev/docs/latest/commands
+
+Source: https://pi.dev/docs/latest/commands
+Library: /local/pi/0.99.2
+
+Use `/reload` to reload extensions.

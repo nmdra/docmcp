@@ -16,12 +16,17 @@ import (
 func newTestClient(t *testing.T) *mcp.ClientSession {
 	t.Helper()
 
-	server := mcpserver.New(mcpserver.Options{
+	return newTestClientWithOptions(t, mcpserver.Options{
 		Version: "v0.1.0-test",
 		Resolve: staticResolver(),
 		Search:  staticSearcher(),
 	})
+}
 
+func newTestClientWithOptions(t *testing.T, opts mcpserver.Options) *mcp.ClientSession {
+	t.Helper()
+
+	server := mcpserver.New(opts)
 	clientTransport, serverTransport := mcp.NewInMemoryTransports()
 
 	serverSession, err := server.Connect(t.Context(), serverTransport, nil)

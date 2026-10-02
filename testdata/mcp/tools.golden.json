@@ -1,0 +1,52 @@
+[
+  {
+    "name": "query-docs",
+    "description": "Retrieves relevant documentation and code examples for an indexed\nlibrary.\n\nUse resolve-library-id first unless an exact DocMCP-compatible library ID\nwas supplied by the user.\n\nThe query should describe one documentation concept clearly and\nspecifically.",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "libraryId": {
+          "type": "string",
+          "description": "an exact library ID from resolve-library-id, such as /local/pi/0.99.2"
+        },
+        "query": {
+          "type": "string",
+          "description": "one documentation concept to retrieve, described clearly"
+        }
+      },
+      "required": ["libraryId", "query"]
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "resolve-library-id",
+    "description": "Resolves a package, product, framework, CLI, API, or documentation\nname into a DocMCP-compatible library ID.\n\nCall this before query-docs unless the user already supplied an exact\nlibrary ID.\n\nUse the user's question in query to rank matching libraries and versions.",
+    "inputSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "libraryName": {
+          "type": "string",
+          "description": "the library, package, framework, CLI, or product name to resolve"
+        },
+        "query": {
+          "type": "string",
+          "description": "the user's question, used to rank matching libraries and versions"
+        }
+      },
+      "required": ["libraryName", "query"]
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  }
+]

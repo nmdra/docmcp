@@ -1,0 +1,8 @@
+### MCP > Control tool exposure
+
+Source: https://pi.dev/docs/latest/mcp
+Library: /local/pi/0.99.2
+
+MCP servers using codemode exposure discover tools lazily.
+
+Use `exposure: codemode` to enable this behavior.

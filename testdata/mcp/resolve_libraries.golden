@@ -1,0 +1,20 @@
+Available Libraries:
+
+- Library ID: /local/pi
+  Name: Pi
+  Description: Pi coding agent documentation
+  Indexed Chunks: 61
+  Versions:
+    - /local/pi/0.99.2
+
+- Library ID: /local/pi/0.99.2
+  Name: Pi
+  Description: Pi coding agent documentation
+  Indexed Chunks: 61
+  Versions:
+    - /local/pi
+
+- Library ID: /local/pi-sdk
+  Name: Pi SDK
+  Description: Pi SDK reference
+  Indexed Chunks: 24
