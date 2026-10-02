@@ -88,14 +88,14 @@ changelog:
 
 release:
   github:
-    owner: docmcp
+    owner: nmdra
     name: docmcp
   draft: false
   prerelease: auto
   name_template: "DocMCP {{.Tag}}"
   footer: |
     ---
-    **Full Changelog**: https://github.com/docmcp/docmcp/compare/{{ .PreviousTag }}...{{ .Tag }}
+    **Full Changelog**: https://github.com/nmdra/docmcp/compare/{{ .PreviousTag }}...{{ .Tag }}
     Released by [GoReleaser](https://goreleaser.com).
 
 sboms:

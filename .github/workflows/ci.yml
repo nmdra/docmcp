@@ -27,6 +27,38 @@ jobs:
       - name: go test -race
         run: go test -race ./...
 
+  provider:
+    name: provider
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: 1.27.0
+
+      # The default embedder downloads a ~190 MB model on first use. Cache it so
+      # the real-provider release gate stays repeatable without paying that cost
+      # on every run. Live-site benchmarks remain opt-in via a separate
+      # variable.
+      - name: Cache the local embedding model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/docmcp/models
+          key: docmcp-model-${{ runner.os }}-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            docmcp-model-${{ runner.os }}-
+      # Serialize cold bootstrap across package test binaries. Both the model
+      # and the embedded Chroma runtime use shared machine cache directories.
+      - name: Cache the Chroma runtime
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/chroma
+          key: chroma-runtime-${{ runner.os }}-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            chroma-runtime-${{ runner.os }}-
+      - name: Provider and local-model tests
+        run: DOCMCP_TEST_LOCAL=1 go test -p 1 -count=1 -tags=provider ./...
+
   integration:
     name: integration
     runs-on: ubuntu-latest
@@ -54,7 +86,9 @@ jobs:
             chroma-runtime-${{ runner.os }}-
 
       - name: Warm the Chroma runtime
-        run: go test -tags=integration -run TestChromaStoreContract/CountChunks ./internal/store/
+        run: >-
+          go test -tags=integration -run TestChromaStoreContract/CountChunks
+          ./internal/store/
 
       # -p 1 stops go test running package binaries in parallel, which is what
       # triggered the concurrent extraction.
