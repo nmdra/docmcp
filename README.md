@@ -161,10 +161,20 @@ the config file:
 export DOCMCP_OPENAI_API_KEY=sk-...
 ```
 
-**One embedding model per index.** The provider, model, and vector width are
-recorded with the index. Changing them is refused with an explanation, because
-mixing vectors from two models into one index silently destroys retrieval. Run
-`docmcp reindex` to rebuild — or index into a fresh `--data-dir`.
+**One embedding configuration per index.** The index records the provider,
+model, vector width, and embedding-text format. Chunk embeddings include the
+page title and heading path. Search results still contain the original text.
+
+If the model or embedding-text format changes, sync refuses to mix old and new
+vectors. For an index with one library, run `docmcp reindex <name>`.
+For a shared index with incompatible vectors, rebuild all libraries in a fresh
+`--data-dir`. A scoped reindex refuses to mark the other libraries' old vectors
+as compatible.
+
+Search combines semantic retrieval with local BM25 and rank fusion for explicit
+technical identifiers, such as `/reload`, `oauth.clientName`, and `query-docs`.
+Ordinary natural-language queries use semantic retrieval. Identifier queries
+scan the library's local chunks; no extra database or network access is required.
 
 ## Scope and safety
 
@@ -188,11 +198,15 @@ mixing vectors from two models into one index silently destroys retrieval. Run
 go test ./...                              # unit and default suite
 go test -race ./...
 go vet ./...
-go test -tags=integration ./...           # real Chroma
-DOCMCP_TEST_LOCAL=1 go test ./internal/embedding/   # real local model
+go test -p 1 -tags=integration ./...       # real Chroma
+DOCMCP_TEST_LOCAL=1 go test -p 1 -tags=provider ./...  # real local model
+DOCMCP_TEST_LIVE_BENCH=1 go test ./internal/app -run '^TestLivePiBenchmark$' # live site
 ```
 
-`make ci` runs all of it.
+`make ci` runs the default, race, integration, and local-provider suites, vet,
+and lint. It does not run the live-site benchmark. A cold provider run needs
+network access to download the model. The live benchmark always needs network
+access to crawl the documentation site.
 
 Most tests need no network, no model, and no external service: embedding is
 faked, providers are exercised against local `httptest` servers, and every data
