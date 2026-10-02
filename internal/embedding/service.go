@@ -68,6 +68,8 @@ func (s *Service) Embed(ctx context.Context, texts []string) ([][]float32, error
 	}
 
 	out := make([][]float32, 0, len(texts))
+	// Unknown provider widths are inferred only for this call, not persisted.
+	wantDim := s.embedder.Dimensions()
 	for start := 0; start < len(texts); start += s.batch {
 		end := min(start+s.batch, len(texts))
 
@@ -75,7 +77,10 @@ func (s *Service) Embed(ctx context.Context, texts []string) ([][]float32, error
 		if err != nil {
 			return nil, fmt.Errorf("embed %d of %d texts: %w", start, len(texts), err)
 		}
-		if err := s.validate(vectors, end-start); err != nil {
+		if wantDim == 0 && len(vectors) > 0 {
+			wantDim = len(vectors[0])
+		}
+		if err := s.validate(vectors, end-start, wantDim); err != nil {
 			return nil, err
 		}
 		out = append(out, vectors...)
@@ -86,18 +91,16 @@ func (s *Service) Embed(ctx context.Context, texts []string) ([][]float32, error
 
 // validate enforces that a provider returned exactly one correctly-sized vector
 // per input text.
-func (s *Service) validate(vectors [][]float32, want int) error {
+func (s *Service) validate(vectors [][]float32, want, wantDim int) error {
 	if len(vectors) != want {
 		return fmt.Errorf("%w: provider returned %d vectors for %d texts",
 			ErrDimensionMismatch, len(vectors), want)
 	}
 
-	wantDim := s.embedder.Dimensions()
 	for i, v := range vectors {
-		if len(v) != wantDim {
-			return fmt.Errorf("%w: vector %d has %d dimensions, want %d from %s/%s",
-				ErrDimensionMismatch, i, len(v), wantDim,
-				s.embedder.Provider(), s.embedder.Model())
+		if err := ValidateEmbedding(v, wantDim); err != nil {
+			return fmt.Errorf("vector %d from %s/%s: %w", i,
+				s.embedder.Provider(), s.embedder.Model(), err)
 		}
 	}
 	return nil

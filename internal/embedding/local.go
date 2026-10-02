@@ -157,14 +157,8 @@ func (e *LocalEmbedder) embedOne(ctx context.Context, text string) ([]float32, e
 	}
 
 	values := vector.ContentAsFloat32()
-	if len(values) == 0 {
-		return nil, fmt.Errorf("%w: local embedder returned an empty vector", ErrDimensionMismatch)
-	}
-
-	if len(values) != e.dim {
-		// A width change means the index's recorded dimensions no longer hold.
-		return nil, fmt.Errorf("%w: local embedder produced %d dimensions, index expects %d",
-			ErrDimensionMismatch, len(values), e.dim)
+	if err := ValidateEmbedding(values, e.dim); err != nil {
+		return nil, fmt.Errorf("local embedder: %w", err)
 	}
 
 	return values, nil

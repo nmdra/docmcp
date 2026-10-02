@@ -9,8 +9,8 @@ import (
 	"github.com/docmcp/docmcp/internal/embedding"
 )
 
-// newLocalEmbedder builds the built-in local embedder. It is skipped unless a
-// model is already cached, because the default suite must not reach the network.
+// newLocalEmbedder builds the built-in local embedder after the opt-in gate.
+// An explicitly requested provider check must fail if initialization fails.
 func newLocalEmbedder(t *testing.T, cacheDir string) *embedding.LocalEmbedder {
 	t.Helper()
 
@@ -19,7 +19,7 @@ func newLocalEmbedder(t *testing.T, cacheDir string) *embedding.LocalEmbedder {
 		Timeout:  2 * time.Minute,
 	})
 	if err != nil {
-		t.Skipf("local embedder unavailable (model not cached): %v", err)
+		t.Fatalf("local embedder initialization failed: %v", err)
 	}
 	return e
 }

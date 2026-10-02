@@ -166,6 +166,9 @@ func (e *OpenAIEmbedder) Embed(ctx context.Context, texts []string) ([][]float32
 			return nil, fmt.Errorf("openai embedder: %w: response is missing vector %d",
 				ErrDimensionMismatch, i)
 		}
+		if err := ValidateEmbedding(v, e.dimensions); err != nil {
+			return nil, fmt.Errorf("openai embedder: vector %d: %w", i, err)
+		}
 	}
 
 	return ordered, nil

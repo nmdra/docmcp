@@ -3,6 +3,8 @@ package embedding_test
 import (
 	"context"
 	"errors"
+	"math"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -260,3 +262,153 @@ func (s *shortEmbedder) Name() string     { return "short" }
 func (s *shortEmbedder) Model() string    { return "short-model" }
 func (s *shortEmbedder) Provider() string { return "fake" }
 func (s *shortEmbedder) Dimensions() int  { return 4 }
+
+// responseEmbedder returns provider output unchanged to exercise the service boundary.
+type responseEmbedder struct {
+	vectors    [][]float32
+	dimensions int
+	calls      int
+}
+
+func (e *responseEmbedder) Embed(context.Context, []string) ([][]float32, error) {
+	e.calls++
+	return e.vectors, nil
+}
+func (e *responseEmbedder) Provider() string { return "fake" }
+func (e *responseEmbedder) Model() string    { return "response" }
+func (e *responseEmbedder) Dimensions() int  { return e.dimensions }
+
+func TestEmbeddingService_RejectsNonfiniteVectorsBeforeReturningResults(t *testing.T) {
+	for _, value := range []float32{float32(math.NaN()), float32(math.Inf(1)), float32(math.Inf(-1))} {
+		provider := &responseEmbedder{vectors: [][]float32{{1, value}}, dimensions: 2}
+		service := embedding.NewService(provider, embedding.WithBatchSize(1))
+		got, err := service.Embed(t.Context(), []string{"invalid", "never requested"})
+		if !errors.Is(err, embedding.ErrDimensionMismatch) {
+			t.Fatalf("error = %v, want ErrDimensionMismatch", err)
+		}
+		if got != nil {
+			t.Fatalf("invalid vectors reached caller: %v", got)
+		}
+		if provider.calls != 1 {
+			t.Fatalf("calls = %d, want 1", provider.calls)
+		}
+	}
+}
+
+func TestEmbeddingService_AcceptsUnknownDimensionsWithoutChangingIdentity(t *testing.T) {
+	provider := &responseEmbedder{vectors: [][]float32{{0, -1, 2}}, dimensions: 0}
+	service := embedding.NewService(provider)
+	got, err := service.Embed(t.Context(), []string{"valid"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, provider.vectors) {
+		t.Fatalf("vectors changed: %v", got)
+	}
+	identity, err := service.Identity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if service.Dimensions() != 0 || identity != "fake/response/0" {
+		t.Fatalf("dimensions/identity changed: %d, %s", service.Dimensions(), identity)
+	}
+}
+
+func TestEmbeddingService_RejectsEmptyVectorWithUnknownDimensions(t *testing.T) {
+	provider := &responseEmbedder{vectors: [][]float32{nil}, dimensions: 0}
+	got, err := embedding.NewService(provider).Embed(t.Context(), []string{"text"})
+	if !errors.Is(err, embedding.ErrDimensionMismatch) || got != nil {
+		t.Fatalf("Embed = %v, %v, want nil and ErrDimensionMismatch", got, err)
+	}
+}
+
+// laterInvalidEmbedder succeeds on the first batch, then returns invalid output.
+type laterInvalidEmbedder struct{ responseEmbedder }
+
+func (e *laterInvalidEmbedder) Embed(context.Context, []string) ([][]float32, error) {
+	e.calls++
+	if e.calls == 1 {
+		return [][]float32{{1, 2}}, nil
+	}
+	return [][]float32{{1, float32(math.NaN())}}, nil
+}
+
+func TestEmbeddingService_InvalidLaterBatchReturnsNoPartialVectors(t *testing.T) {
+	provider := &laterInvalidEmbedder{responseEmbedder: responseEmbedder{dimensions: 2}}
+	service := embedding.NewService(provider, embedding.WithBatchSize(1))
+	got, err := service.Embed(t.Context(), []string{"valid", "invalid", "never requested"})
+	if !errors.Is(err, embedding.ErrDimensionMismatch) || got != nil {
+		t.Fatalf("Embed = %v, %v, want nil and ErrDimensionMismatch", got, err)
+	}
+	if provider.calls != 2 {
+		t.Fatalf("calls = %d, want 2", provider.calls)
+	}
+}
+
+func TestEmbeddingService_UnknownDimensionsRejectsMixedWidthsInBatch(t *testing.T) {
+	provider := &responseEmbedder{vectors: [][]float32{{1, 2}, {3, 4, 5}}, dimensions: 0}
+	service := embedding.NewService(provider)
+	got, err := service.Embed(t.Context(), []string{"first", "second"})
+	if !errors.Is(err, embedding.ErrDimensionMismatch) || got != nil {
+		t.Fatalf("Embed = %v, %v, want nil and ErrDimensionMismatch", got, err)
+	}
+	identity, err := service.Identity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if service.Dimensions() != 0 || identity != "fake/response/0" {
+		t.Fatalf("dimensions/identity changed: %d, %s", service.Dimensions(), identity)
+	}
+}
+
+// changingWidthEmbedder supplies a different width on each successive batch.
+type changingWidthEmbedder struct{ responseEmbedder }
+
+func (e *changingWidthEmbedder) Embed(context.Context, []string) ([][]float32, error) {
+	e.calls++
+	if e.calls == 1 {
+		return [][]float32{{1, 2}}, nil
+	}
+	return [][]float32{{3, 4, 5}}, nil
+}
+
+func TestEmbeddingService_UnknownDimensionsRejectsMixedWidthsAcrossBatches(t *testing.T) {
+	provider := &changingWidthEmbedder{}
+	service := embedding.NewService(provider, embedding.WithBatchSize(1))
+	got, err := service.Embed(t.Context(), []string{"first", "second", "never requested"})
+	if !errors.Is(err, embedding.ErrDimensionMismatch) || got != nil {
+		t.Fatalf("Embed = %v, %v, want nil and ErrDimensionMismatch", got, err)
+	}
+	if provider.calls != 2 {
+		t.Fatalf("calls = %d, want 2", provider.calls)
+	}
+	identity, err := service.Identity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if service.Dimensions() != 0 || identity != "fake/response/0" {
+		t.Fatalf("dimensions/identity changed: %d, %s", service.Dimensions(), identity)
+	}
+}
+
+func TestEmbeddingService_UnknownDimensionsInferenceIsLocalToEachCall(t *testing.T) {
+	provider := &responseEmbedder{dimensions: 0}
+	service := embedding.NewService(provider)
+	for _, vector := range [][]float32{{1, 2}, {3, 4, 5}} {
+		provider.vectors = [][]float32{vector}
+		got, err := service.Embed(t.Context(), []string{"text"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(got, provider.vectors) {
+			t.Fatalf("vectors changed: %v", got)
+		}
+	}
+	identity, err := service.Identity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if service.Dimensions() != 0 || identity != "fake/response/0" {
+		t.Fatalf("dimensions/identity changed: %d, %s", service.Dimensions(), identity)
+	}
+}

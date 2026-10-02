@@ -20,9 +20,10 @@ func TestOpenAIEmbedder_Endpoint(t *testing.T) {
 	defer srv.Close()
 
 	e, err := embedding.NewOpenAIEmbedder(embedding.OpenAIConfig{
-		BaseURL: srv.URL + "/v1",
-		Model:   "text-embedding-3-small",
-		APIKey:  "test-key",
+		Dimensions: 3,
+		BaseURL:    srv.URL + "/v1",
+		Model:      "text-embedding-3-small",
+		APIKey:     "test-key",
 	})
 	if err != nil {
 		t.Fatalf("NewOpenAIEmbedder: %v", err)
@@ -51,7 +52,8 @@ func TestOpenAIEmbedder_AuthHeader(t *testing.T) {
 	defer srv.Close()
 
 	e, _ := embedding.NewOpenAIEmbedder(embedding.OpenAIConfig{
-		BaseURL: srv.URL, Model: "m", APIKey: "sk-secret",
+		Dimensions: 1,
+		BaseURL:    srv.URL, Model: "m", APIKey: "sk-secret",
 	})
 
 	if _, err := e.Embed(t.Context(), []string{"a"}); err != nil {
@@ -76,7 +78,8 @@ func TestOpenAIEmbedder_Model(t *testing.T) {
 	defer srv.Close()
 
 	e, _ := embedding.NewOpenAIEmbedder(embedding.OpenAIConfig{
-		BaseURL: srv.URL, Model: "text-embedding-3-large", APIKey: "k",
+		Dimensions: 1,
+		BaseURL:    srv.URL, Model: "text-embedding-3-large", APIKey: "k",
 	})
 
 	if _, err := e.Embed(t.Context(), []string{"a"}); err != nil {
@@ -106,7 +109,8 @@ func TestOpenAIEmbedder_Batch(t *testing.T) {
 	defer srv.Close()
 
 	e, _ := embedding.NewOpenAIEmbedder(embedding.OpenAIConfig{
-		BaseURL: srv.URL, Model: "m", APIKey: "k",
+		Dimensions: 1,
+		BaseURL:    srv.URL, Model: "m", APIKey: "k",
 	})
 
 	if _, err := e.Embed(t.Context(), []string{"alpha", "bravo", "charlie"}); err != nil {
@@ -153,8 +157,9 @@ func TestOpenAIEmbedder_ReadsAPIKeyFromEnvironment(t *testing.T) {
 	t.Setenv("DOCMCP_OPENAI_API_KEY", "sk-from-env")
 
 	e, err := embedding.NewOpenAIEmbedder(embedding.OpenAIConfig{
-		BaseURL: "https://api.openai.test/v1",
-		Model:   "m",
+		Dimensions: 1,
+		BaseURL:    "https://api.openai.test/v1",
+		Model:      "m",
 	})
 	if err != nil {
 		t.Fatalf("NewOpenAIEmbedder: %v", err)
@@ -240,7 +245,8 @@ func TestOpenAIEmbedder_ReordersByIndex(t *testing.T) {
 	defer srv.Close()
 
 	e, _ := embedding.NewOpenAIEmbedder(embedding.OpenAIConfig{
-		BaseURL: srv.URL, Model: "m", APIKey: "k",
+		Dimensions: 1,
+		BaseURL:    srv.URL, Model: "m", APIKey: "k",
 	})
 
 	got, err := e.Embed(t.Context(), []string{"first", "second", "third"})

@@ -126,17 +126,19 @@ func (e *OllamaEmbedder) embedOne(ctx context.Context, text string) ([]float32, 
 		return nil, fmt.Errorf("ollama embedder: %s", parsed.Error)
 	}
 
-	switch {
-	case len(parsed.Embedding) > 0:
-		return parsed.Embedding, nil
-	case len(parsed.Embeddings) > 0 && len(parsed.Embeddings[0]) > 0:
-		return parsed.Embeddings[0], nil
-	default:
-		// A zero-length vector is not a vector. Accepting one would write an
-		// unsearchable chunk into the index and only fail later, at query time.
-		return nil, fmt.Errorf("ollama embedder: %w: response from %s carried no vector for model %s",
-			ErrDimensionMismatch, e.baseURL, e.model)
+	vector := parsed.Embedding
+	if len(vector) == 0 && len(parsed.Embeddings) > 0 {
+		vector = parsed.Embeddings[0]
 	}
+	if err := ValidateEmbedding(vector, e.Dimensions()); err != nil {
+		if len(vector) == 0 {
+			return nil, fmt.Errorf("ollama embedder: %w: response from %s carried no vector for model %s",
+				ErrDimensionMismatch, e.baseURL, e.model)
+		}
+		return nil, fmt.Errorf("ollama embedder: response from %s for model %s: %w",
+			e.baseURL, e.model, err)
+	}
+	return vector, nil
 }
 
 // providerMessage pulls the human-readable part out of an error payload,
