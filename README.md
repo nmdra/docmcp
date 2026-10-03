@@ -118,7 +118,7 @@ setup. `examples/` has ready-made files for Claude Code, Cursor, and Pi.
 Install DocMCP and index a documentation site:
 
 ```bash
-go install github.com/docmcp/docmcp/cmd/docmcp@latest
+go install github.com/nmdra/docmcp/cmd/docmcp@latest
 docmcp add https://example.com/docs/ --name example
 ```
 

@@ -9,8 +9,8 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/spf13/cobra"
 
-	"github.com/docmcp/docmcp/internal/mcpserver"
-	"github.com/docmcp/docmcp/internal/search"
+	"github.com/nmdra/docmcp/internal/mcpserver"
+	"github.com/nmdra/docmcp/internal/search"
 )
 
 // newServeCommand runs the MCP server over stdio.

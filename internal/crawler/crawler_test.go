@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docmcp/docmcp/internal/crawler"
+	"github.com/nmdra/docmcp/internal/crawler"
 )
 
 // fixtureSite serves a small documentation site over httptest and records every

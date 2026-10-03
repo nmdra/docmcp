@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/docmcp/docmcp/internal/embedding"
-	"github.com/docmcp/docmcp/internal/source"
+	"github.com/nmdra/docmcp/internal/embedding"
+	"github.com/nmdra/docmcp/internal/source"
 )
 
 var (

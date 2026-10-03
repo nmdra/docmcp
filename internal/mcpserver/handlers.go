@@ -9,8 +9,8 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/docmcp/docmcp/internal/search"
-	"github.com/docmcp/docmcp/internal/source"
+	"github.com/nmdra/docmcp/internal/search"
+	"github.com/nmdra/docmcp/internal/source"
 )
 
 // The two input schemas are written out by hand rather than inferred from Go

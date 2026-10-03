@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docmcp/docmcp/internal/parser"
+	"github.com/nmdra/docmcp/internal/parser"
 )
 
 func htmlFixture(t *testing.T, name string) string {

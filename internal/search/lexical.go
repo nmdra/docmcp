@@ -7,7 +7,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/docmcp/docmcp/internal/store"
+	"github.com/nmdra/docmcp/internal/store"
 )
 
 const (

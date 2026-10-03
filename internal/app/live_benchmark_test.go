@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docmcp/docmcp/internal/config"
+	"github.com/nmdra/docmcp/internal/config"
 )
 
 // TestLivePiBenchmark measures retrieval against the real pi.dev index.

@@ -11,9 +11,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/docmcp/docmcp/internal/ingest"
-	"github.com/docmcp/docmcp/internal/source"
-	"github.com/docmcp/docmcp/internal/store"
+	"github.com/nmdra/docmcp/internal/ingest"
+	"github.com/nmdra/docmcp/internal/source"
+	"github.com/nmdra/docmcp/internal/store"
 )
 
 // Runtime is built once per command run and torn down on the way out.

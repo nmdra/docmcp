@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/docmcp/docmcp/internal/store"
+	"github.com/nmdra/docmcp/internal/store"
 )
 
 // TestMemoryStoreContract runs the shared suite against an in-memory store. It

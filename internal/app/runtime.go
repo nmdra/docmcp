@@ -8,14 +8,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docmcp/docmcp/internal/chunker"
-	"github.com/docmcp/docmcp/internal/config"
-	"github.com/docmcp/docmcp/internal/crawler"
-	"github.com/docmcp/docmcp/internal/embedding"
-	"github.com/docmcp/docmcp/internal/ingest"
-	"github.com/docmcp/docmcp/internal/search"
-	"github.com/docmcp/docmcp/internal/source"
-	"github.com/docmcp/docmcp/internal/store"
+	"github.com/nmdra/docmcp/internal/chunker"
+	"github.com/nmdra/docmcp/internal/config"
+	"github.com/nmdra/docmcp/internal/crawler"
+	"github.com/nmdra/docmcp/internal/embedding"
+	"github.com/nmdra/docmcp/internal/ingest"
+	"github.com/nmdra/docmcp/internal/search"
+	"github.com/nmdra/docmcp/internal/source"
+	"github.com/nmdra/docmcp/internal/store"
 )
 
 // Runtime is the assembled application: the real crawler, parser, chunker,

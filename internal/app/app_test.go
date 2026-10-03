@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docmcp/docmcp/internal/app"
+	"github.com/nmdra/docmcp/internal/app"
 )
 
 func TestVersionCommand(t *testing.T) {

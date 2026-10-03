@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docmcp/docmcp/internal/chunker"
-	"github.com/docmcp/docmcp/internal/ingest"
-	"github.com/docmcp/docmcp/internal/store"
+	"github.com/nmdra/docmcp/internal/chunker"
+	"github.com/nmdra/docmcp/internal/ingest"
+	"github.com/nmdra/docmcp/internal/store"
 )
 
 // newChunker wires the real chunker, so chunk IDs and hashes under test are the

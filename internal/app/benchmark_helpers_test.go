@@ -6,11 +6,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/docmcp/docmcp/internal/chunker"
-	"github.com/docmcp/docmcp/internal/embedding"
-	"github.com/docmcp/docmcp/internal/ingest"
-	"github.com/docmcp/docmcp/internal/search"
-	"github.com/docmcp/docmcp/internal/store"
+	"github.com/nmdra/docmcp/internal/chunker"
+	"github.com/nmdra/docmcp/internal/embedding"
+	"github.com/nmdra/docmcp/internal/ingest"
+	"github.com/nmdra/docmcp/internal/search"
+	"github.com/nmdra/docmcp/internal/store"
 )
 
 // benchmarkLibraryID is the single library the whole benchmark corpus lives in.

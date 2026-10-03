@@ -321,7 +321,7 @@ func buildBinary(t *testing.T) string {
 
 	binary := filepath.Join(t.TempDir(), "docmcp")
 
-	cmd := exec.Command("go", "build", "-o", binary, "github.com/docmcp/docmcp/cmd/docmcp")
+	cmd := exec.Command("go", "build", "-o", binary, "github.com/nmdra/docmcp/cmd/docmcp")
 	cmd.Dir = repoRoot(t)
 
 	out, err := cmd.CombinedOutput()

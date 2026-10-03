@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docmcp/docmcp/internal/embedding"
+	"github.com/nmdra/docmcp/internal/embedding"
 )
 
 func TestOpenAIEmbedder_Endpoint(t *testing.T) {

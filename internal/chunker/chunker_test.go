@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docmcp/docmcp/internal/chunker"
+	"github.com/nmdra/docmcp/internal/chunker"
 )
 
 func chunkDoc(t *testing.T, markdown string, opts ...chunker.Option) []chunker.Chunk {

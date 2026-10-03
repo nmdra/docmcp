@@ -1,4 +1,4 @@
-module github.com/docmcp/docmcp
+module github.com/nmdra/docmcp
 
 go 1.27.0
 

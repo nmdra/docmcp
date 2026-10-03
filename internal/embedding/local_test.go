@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docmcp/docmcp/internal/embedding"
+	"github.com/nmdra/docmcp/internal/embedding"
 )
 
 // newLocalEmbedder builds the built-in local embedder after the opt-in gate.

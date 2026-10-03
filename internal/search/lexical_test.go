@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docmcp/docmcp/internal/search"
-	"github.com/docmcp/docmcp/internal/store"
+	"github.com/nmdra/docmcp/internal/search"
+	"github.com/nmdra/docmcp/internal/store"
 )
 
 func TestSearch_AcronymQueryFindsDirectAnswerWithinResultBudget(t *testing.T) {

@@ -5,7 +5,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/docmcp/docmcp/internal/embedding"
+	"github.com/nmdra/docmcp/internal/embedding"
 )
 
 func TestEmbeddingValidator_Empty(t *testing.T) {

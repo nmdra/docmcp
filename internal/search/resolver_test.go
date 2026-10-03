@@ -3,8 +3,8 @@ package search_test
 import (
 	"testing"
 
-	"github.com/docmcp/docmcp/internal/search"
-	"github.com/docmcp/docmcp/internal/source"
+	"github.com/nmdra/docmcp/internal/search"
+	"github.com/nmdra/docmcp/internal/source"
 )
 
 func libraries() []source.Source {

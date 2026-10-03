@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docmcp/docmcp/internal/app"
-	"github.com/docmcp/docmcp/internal/config"
+	"github.com/nmdra/docmcp/internal/app"
+	"github.com/nmdra/docmcp/internal/config"
 )
 
 // TestAdd_EmptyCrawlFailsLoudly pins the behaviour that a source yielding no

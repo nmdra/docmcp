@@ -4,8 +4,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/docmcp/docmcp/internal/config"
-	"github.com/docmcp/docmcp/internal/store"
+	"github.com/nmdra/docmcp/internal/config"
+	"github.com/nmdra/docmcp/internal/store"
 )
 
 func writeFile(path, body string) error {

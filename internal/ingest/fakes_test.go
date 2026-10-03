@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/docmcp/docmcp/internal/ingest"
-	"github.com/docmcp/docmcp/internal/source"
-	"github.com/docmcp/docmcp/internal/store"
+	"github.com/nmdra/docmcp/internal/ingest"
+	"github.com/nmdra/docmcp/internal/source"
+	"github.com/nmdra/docmcp/internal/store"
 )
 
 // fakeStore records what it was asked to write. It is deliberately transparent:

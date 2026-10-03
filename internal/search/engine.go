@@ -7,8 +7,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/docmcp/docmcp/internal/source"
-	"github.com/docmcp/docmcp/internal/store"
+	"github.com/nmdra/docmcp/internal/source"
+	"github.com/nmdra/docmcp/internal/store"
 )
 
 var (

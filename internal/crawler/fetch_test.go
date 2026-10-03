@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docmcp/docmcp/internal/crawler"
+	"github.com/nmdra/docmcp/internal/crawler"
 )
 
 func newFetcher(t *testing.T, limits crawler.FetchLimits) *crawler.HTTPFetcher {

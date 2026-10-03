@@ -6,7 +6,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/docmcp/docmcp/internal/store"
+	"github.com/nmdra/docmcp/internal/store"
 )
 
 // TestChromaStoreContract runs the shared contract against a real, persistent

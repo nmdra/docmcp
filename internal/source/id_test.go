@@ -3,7 +3,7 @@ package source_test
 import (
 	"testing"
 
-	"github.com/docmcp/docmcp/internal/source"
+	"github.com/nmdra/docmcp/internal/source"
 )
 
 func TestNewLibraryID_Base(t *testing.T) {

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docmcp/docmcp/internal/source"
+	"github.com/nmdra/docmcp/internal/source"
 )
 
 func TestSourceRepository_Add(t *testing.T) {

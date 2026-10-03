@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docmcp/docmcp/internal/config"
+	"github.com/nmdra/docmcp/internal/config"
 )
 
 // mcpDocsSite is the fixture from the plan's golden scenario: a two-section page

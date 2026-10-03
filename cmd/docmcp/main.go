@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/docmcp/docmcp/internal/app"
+	"github.com/nmdra/docmcp/internal/app"
 )
 
 // version is stamped at build time:

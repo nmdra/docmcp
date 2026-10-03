@@ -159,7 +159,7 @@ func (f *HTTPFetcher) Fetch(ctx context.Context, uri string, opts ...FetchOption
 	return page, nil
 }
 
-const userAgent = "DocMCP/0.1 (+https://github.com/docmcp/docmcp)"
+const userAgent = "DocMCP/0.1 (+https://github.com/nmdra/docmcp)"
 
 func finalURL(resp *http.Response, fallback string) string {
 	if resp.Request == nil || resp.Request.URL == nil {

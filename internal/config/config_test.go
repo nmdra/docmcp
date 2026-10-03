@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docmcp/docmcp/internal/config"
+	"github.com/nmdra/docmcp/internal/config"
 )
 
 func writeConfig(t *testing.T, body string) string {

@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/docmcp/docmcp/internal/crawler"
+	"github.com/nmdra/docmcp/internal/crawler"
 )
 
 func TestDiscoverSitemap_FromRobots(t *testing.T) {

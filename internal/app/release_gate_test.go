@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docmcp/docmcp/internal/config"
+	"github.com/nmdra/docmcp/internal/config"
 )
 
 // TestFreshMachine_DefaultProviderWorksOffline is the release gate: with no API

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docmcp/docmcp/internal/config"
+	"github.com/nmdra/docmcp/internal/config"
 )
 
 // bufReader reads JSON-RPC lines from the server's stdout. Every line must parse

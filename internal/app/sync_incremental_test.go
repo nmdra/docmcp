@@ -8,7 +8,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/docmcp/docmcp/internal/config"
+	"github.com/nmdra/docmcp/internal/config"
 )
 
 // mutableSite is a documentation tree whose pages can be edited between crawls,

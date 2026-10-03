@@ -7,7 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/docmcp/docmcp/internal/search"
+	"github.com/nmdra/docmcp/internal/search"
 )
 
 // newSearchCommand runs a retrieval from the terminal.

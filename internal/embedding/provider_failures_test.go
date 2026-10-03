@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docmcp/docmcp/internal/embedding"
+	"github.com/nmdra/docmcp/internal/embedding"
 )
 
 // fakeEmbeddingServer responds to /api/embed (Ollama) or /v1/embeddings

@@ -16,7 +16,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/docmcp/docmcp/internal/search"
+	"github.com/nmdra/docmcp/internal/search"
 )
 
 var (

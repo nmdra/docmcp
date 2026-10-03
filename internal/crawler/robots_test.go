@@ -3,7 +3,7 @@ package crawler_test
 import (
 	"testing"
 
-	"github.com/docmcp/docmcp/internal/crawler"
+	"github.com/nmdra/docmcp/internal/crawler"
 )
 
 func TestRobots_AllowsPath(t *testing.T) {

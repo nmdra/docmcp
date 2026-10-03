@@ -3,8 +3,8 @@ package mcpserver_test
 import (
 	"context"
 
-	"github.com/docmcp/docmcp/internal/mcpserver"
-	"github.com/docmcp/docmcp/internal/search"
+	"github.com/nmdra/docmcp/internal/mcpserver"
+	"github.com/nmdra/docmcp/internal/search"
 )
 
 // resolverFunc and searcherFunc let a test drive the two tools without a store

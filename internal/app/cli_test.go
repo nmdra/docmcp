@@ -9,8 +9,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/docmcp/docmcp/internal/app"
-	"github.com/docmcp/docmcp/internal/config"
+	"github.com/nmdra/docmcp/internal/app"
+	"github.com/nmdra/docmcp/internal/config"
 )
 
 // fixtureSite is a documentation site whose pages can change between runs, which

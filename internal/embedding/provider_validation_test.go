@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/docmcp/docmcp/internal/embedding"
+	"github.com/nmdra/docmcp/internal/embedding"
 )
 
 func TestOpenAI_RejectsWrongWidthAtProviderBoundary(t *testing.T) {

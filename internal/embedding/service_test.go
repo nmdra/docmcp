@@ -9,7 +9,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/docmcp/docmcp/internal/embedding"
+	"github.com/nmdra/docmcp/internal/embedding"
 )
 
 // FakeEmbedder is a hand-written stand-in for a real provider. It records every

@@ -3,11 +3,11 @@ package app
 import (
 	"context"
 
-	"github.com/docmcp/docmcp/internal/chunker"
-	"github.com/docmcp/docmcp/internal/crawler"
-	"github.com/docmcp/docmcp/internal/ingest"
-	"github.com/docmcp/docmcp/internal/parser"
-	"github.com/docmcp/docmcp/internal/store"
+	"github.com/nmdra/docmcp/internal/chunker"
+	"github.com/nmdra/docmcp/internal/crawler"
+	"github.com/nmdra/docmcp/internal/ingest"
+	"github.com/nmdra/docmcp/internal/parser"
+	"github.com/nmdra/docmcp/internal/store"
 )
 
 // crawlerAdapter presents crawler.Crawler as an ingest.Crawler, converting the

@@ -12,7 +12,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/docmcp/docmcp/internal/source"
+	"github.com/nmdra/docmcp/internal/source"
 )
 
 var ErrLibraryNotFound = errors.New("library not found")

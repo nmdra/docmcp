@@ -7,7 +7,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/docmcp/docmcp/internal/mcpserver"
+	"github.com/nmdra/docmcp/internal/mcpserver"
 )
 
 // newTestClient connects a real MCP client to the server over an in-memory

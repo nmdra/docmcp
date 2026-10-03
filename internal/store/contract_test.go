@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docmcp/docmcp/internal/store"
+	"github.com/nmdra/docmcp/internal/store"
 )
 
 // Factory builds an empty store that satisfies the Store contract.

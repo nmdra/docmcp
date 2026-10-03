@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docmcp/docmcp/internal/search"
-	"github.com/docmcp/docmcp/internal/store"
+	"github.com/nmdra/docmcp/internal/search"
+	"github.com/nmdra/docmcp/internal/store"
 )
 
 // chunk builds a searchable chunk with a citable source.
