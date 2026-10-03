@@ -27,6 +27,7 @@ remain the specification, not a claim that every task is complete.
 - [x] Fix the direct-MCP-exposure miss with acronym-aware hybrid retrieval and benchmark gates.
 - [x] Correct the GoReleaser repository identity and pass `goreleaser check`.
 - [x] Build and install-test the approved Linux amd64 alpha snapshot profile.
+- [x] Publish `v0.1.0-alpha.2` and verify the archive, checksum, and `go install @latest` path.
 - [ ] Complete the full signed multi-platform snapshot. This host lacks the Linux ARM64 cgo cross-compiler.
 - [ ] Complete table-context, UX, security, diagnostics, and release tasks.
 
@@ -38,9 +39,11 @@ Top-5 12/12, MRR 0.812, and Recall@5 1.000. The original six queries reach
 Top-5 in 6/6 cases. Direct exposure ranks 2 and returns the answer-bearing text.
 A separate 12-query Pi-agent batch over the persistent project snapshot matched
 all queries within six results, with 11/12 in Top-5; direct exposure ranked 3.
-See `docs/validation/2026-10-02-pi-agent-mcp-validation.md`. The limited alpha
-profile builds Linux amd64 only and omits signatures and SBOMs. The full signed
-multi-platform release gate remains open.
+See `docs/validation/2026-10-02-pi-agent-mcp-validation.md`. Release
+`v0.1.0-alpha.2` is published for Linux amd64 only and omits signatures and
+SBOMs. Alpha.1 remains published with its incorrect Go module path. The full
+signed multi-platform release gate remains open. See
+`docs/validation/2026-10-03-alpha-release.md`.
 
 Unrestricted natural-language lexical fusion regressed synthetic MRR, so it was
 rejected. Syntax-bearing identifiers and all-caps tokens in mixed-case queries
@@ -1328,7 +1331,10 @@ local MCP over stdio
 
 # 26. Public Alpha Release Gate
 
-Do not release publicly until all of these hold.
+Default policy: do not release publicly until all of these hold. The limited
+Linux amd64 pre-releases `v0.1.0-alpha.1` and `v0.1.0-alpha.2` were explicitly
+approved before the full gate passed. This exception does not mark the full gate
+complete. See `docs/validation/2026-10-03-alpha-release.md`.
 
 ## Correctness
 

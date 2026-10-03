@@ -117,18 +117,19 @@ cause a change to the crawler.
 The first isolated snapshot attempt failed during `go mod tidy` because
 `proxy.golang.org` DNS lookup timed out. A later default-profile attempt resolved
 dependencies but failed to cross-compile Linux ARM64 cgo on this host. The
-approved `.goreleaser-alpha.yaml` profile then built a Linux amd64 snapshot. I
-extracted its archive and ran `docmcp version` and `docmcp --help` successfully.
-This first-alpha profile has no signatures or SBOMs. The default full-platform
-profile remains unverified. `make ci`, both GoReleaser config checks, and a local
-`go install ./cmd/docmcp` smoke test passed.
+approved `.goreleaser-alpha.yaml` profile built and published Linux amd64
+releases `v0.1.0-alpha.1` and `v0.1.0-alpha.2`. Alpha.1 had an incorrect module
+path; alpha.2 fixes it. The downloaded alpha.2 archive checksum passed, its CLI
+ran, and both explicit-version and `@latest` Go installs passed. This profile has
+no signatures or SBOMs. The default full-platform profile remains unverified.
+See `2026-10-03-alpha-release.md`.
 
 ## Remaining work and limitations
 
 - Complete table-context evaluation and the remaining UX, redaction, diagnostics,
   performance, stdio, and installation tasks in the plan.
 - Complete the full signed multi-platform snapshot with cross-compilers.
-  The limited Linux amd64 alpha archive passed its install smoke test.
+  Alpha.2 is verified for Linux amd64; its full release gates remain open.
 - Identifier queries scan the full scoped library corpus. There is no separate
   lexical index or cache.
 - Failed reindex can remove the target library's chunks before a replacement
