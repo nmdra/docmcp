@@ -181,16 +181,36 @@ func technicalTokens(ctx context.Context, text string) (map[string]int, error) {
 }
 
 // hasTechnicalIdentifier routes explicit identifier syntax to hybrid search.
-// It recognizes slash commands, internal dots/hyphens, and lower-to-upper camel
-// transitions. Plain words and sentence-ending punctuation stay dense-only.
-// This is syntax-based, not a vocabulary of product or API names.
+// It recognizes slash commands, internal dots/hyphens, camel case, and all-caps
+// tokens in otherwise normally cased queries. Plain words and fully uppercase
+// phrases stay dense-only. All-caps emphasis can also select hybrid retrieval.
 func hasTechnicalIdentifier(query string) bool {
 	identifiers := strings.FieldsFunc(query, func(r rune) bool {
 		return !unicode.IsLetter(r) && !unicode.IsDigit(r) && !strings.ContainsRune("._-/", r)
 	})
 	isAlphanumeric := func(r rune) bool { return unicode.IsLetter(r) || unicode.IsDigit(r) }
+	hasLowercase := false
+	for _, r := range query {
+		if unicode.IsLower(r) {
+			hasLowercase = true
+			break
+		}
+	}
 	for _, identifier := range identifiers {
 		runes := []rune(identifier)
+		uppercaseLetters := 0
+		allLettersUppercase := true
+		for _, r := range runes {
+			if unicode.IsLetter(r) {
+				uppercaseLetters++
+				if !unicode.IsUpper(r) {
+					allLettersUppercase = false
+				}
+			}
+		}
+		if hasLowercase && allLettersUppercase && uppercaseLetters >= 2 {
+			return true
+		}
 		for i, r := range runes {
 			if r == '/' && i+1 < len(runes) && isAlphanumeric(runes[i+1]) {
 				return true

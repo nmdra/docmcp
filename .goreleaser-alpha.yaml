@@ -1,0 +1,82 @@
+# First alpha release profile: Linux amd64 only, without signatures or an SBOM.
+# The standard .goreleaser.yaml profile remains the target for later releases.
+version: 2
+
+project_name: docmcp
+
+before:
+  hooks:
+    - go mod tidy
+    - go mod vendor
+
+builds:
+  - id: docmcp
+    main: ./cmd/docmcp
+    binary: docmcp
+    flags:
+      - -mod=vendor
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - linux
+    goarch:
+      - amd64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+
+archives:
+  - id: docmcp
+    ids: [docmcp]
+    formats: [tar.gz]
+    name_template: >-
+      docmcp_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else }}{{ .Arch }}{{ end }}
+    files:
+      - README.md
+      - LICENSE
+      - src: examples/README.md
+        dst: examples/README.md
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+  use: github
+  groups:
+    - title: "🚀 Features"
+      regexp: "^feat"
+      order: 0
+    - title: "🐛 Bug Fixes"
+      regexp: "^fix"
+      order: 1
+    - title: Other
+      order: 999
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+      - "Merge pull request"
+
+release:
+  github:
+    owner: nmdra
+    name: docmcp
+  draft: false
+  prerelease: auto
+  name_template: "DocMCP {{.Tag}}"
+  footer: |
+    ---
+    **Full Changelog**:
+    https://github.com/nmdra/docmcp/compare/{{ .PreviousTag }}...{{ .Tag }}
+    Released by [GoReleaser](https://goreleaser.com).
+
+snapshot:
+  version_template: "{{ .Tag }}-next"

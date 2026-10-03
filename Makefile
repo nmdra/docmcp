@@ -1,7 +1,8 @@
 .PHONY: fmt test test-race vet lint integration provider ci build
 
 fmt:
-	@test -z "$$(gofmt -l .)" || (echo "needs gofmt:"; gofmt -l .; exit 1)
+	@git ls-files -co --exclude-standard -- '*.go' | xargs gofmt -l | \
+		awk 'NF { if (!bad++) print "needs gofmt:"; print } END { exit bad }'
 
 build:
 	go build -ldflags "-X main.version=$(shell git describe --tags --always --dirty 2>/dev/null || echo dev)" -o bin/docmcp ./cmd/docmcp

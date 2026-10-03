@@ -62,7 +62,7 @@ var liveBenchmarkCases = []retrievalBenchmarkCase{
 		libraryID:       "/local/pi/current",
 		expectedURLs:    []string{"https://pi.dev/docs/latest/mcp"},
 		expectedHeads:   []string{"Control tool exposure"},
-		expectedContent: []string{"direct"},
+		expectedContent: []string{"Declared to the model like a built-in tool"},
 		baseline:        true,
 	},
 	{
@@ -202,9 +202,9 @@ func liveBenchmark(t *testing.T) {
 		t.Errorf("live quality gate failed: Top-5 %.3f (want >= .90), Top-3 %.3f (want >= .80)",
 			metrics.Top5, metrics.Top3)
 	}
-	// Preserve the improved original subset independently from new queries.
-	// Direct exposure remains a known miss requiring further ranking work.
-	const knownMisses = 1
+	// Preserve the original subset independently from new queries. All six now
+	// pass, including the direct-exposure case that previously missed Top-5.
+	const knownMisses = 0
 	if baselineCases == 0 || baselineTop5 < baselineCases-knownMisses {
 		t.Errorf("only %d of %d original live queries found their section in the top 5; want at least %d",
 			baselineTop5, baselineCases, baselineCases-knownMisses)

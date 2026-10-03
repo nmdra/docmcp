@@ -16,8 +16,12 @@ public-alpha readiness. The full plan remains in
 - Adjacent chunks from one full heading receive a two-result soft cap. Deferred
   chunks fill unused slots. Ambiguous indices bypass this policy.
 - Chroma queries retain nonzero chunk indices.
-- Explicit technical identifiers use library-scoped BM25 candidates and RRF.
-  Ordinary natural-language queries retain semantic retrieval.
+- Identifier syntax and all-caps tokens in normally cased queries use
+  library-scoped BM25 candidates and RRF. Other prose retains semantic ranking.
+  All-caps emphasis can also select hybrid retrieval.
+- The direct-exposure live relevance check requires the answer-bearing phrase
+  `Declared to the model like a built-in tool`, not the ambiguous substring
+  `direct` that also matched `indirect`.
 - Lexical processing observes context cancellation.
 - Shared embedding validation rejects empty, wrong-width, and nonfinite vectors.
   Unknown widths must remain consistent within each embedding call and index.
@@ -51,21 +55,30 @@ declared answer page. They are separate metrics, not interchangeable labels.
 The live benchmark now has 12 queries. Expected URLs, headings, and selected
 answer-content checks define relevance. It remains opt-in.
 
-| Metric | Expanded pre-change run | Current checkpoint |
-|---|---:|---:|
-| Top-1 | 3/12 | 8/12 |
-| Top-3 | 8/12 | 10/12 |
-| Top-5 | 9/12 | 11/12 |
-| MRR | 0.461 | 0.771 |
-| Recall@5 | 0.750 | 0.917 |
+| Metric | Expanded pre-change | Before acronym routing | Current |
+|---|---:|---:|---:|
+| Top-1 | 3/12 | 8/12 | 8/12 |
+| Top-3 | 8/12 | 10/12 | 11/12 |
+| Top-5 | 9/12 | 11/12 | 12/12 |
+| MRR | 0.461 | 0.771 | 0.812 |
+| Recall@5 | 0.750 | 0.917 | 1.000 |
 
-The original six-query subset improved from 4/6 to 5/6 Top-5. The general
-slash-command query now finds the overview at rank 1. The `/reload` query finds
-its command description. The OAuth identifier query finds its section at rank 1.
+The current original six-query subset reaches Top-5 in 6/6 cases. The general
+slash-command query finds the overview at rank 1, `/reload` finds its command
+description, and the OAuth identifier query finds its section at rank 1. Direct
+MCP exposure now ranks at 2 with the answer-bearing description. Top-1 held
+steady relative to the prior checkpoint, Top-3 and Top-5 improved, and MRR rose
+from 0.771 to 0.812. Live documentation can change between runs.
 
-Direct MCP exposure remains a miss in Top-5. Candidate diagnostics find the
-content-qualified answer at rank 7 after diversification. Live documentation and
-approximate candidate retrieval can change between runs.
+A Pi agent test used the project MCP server over stdio, resolved `pi` to
+`/local/pi/current`, then called `query-docs` for “How does direct MCP exposure
+work?”. It returned the `Control tool exposure` section, including: “Declared to
+the model like a built-in tool and also callable from codemode.” The project MCP
+entry is in `.pi/mcp.json`; because the project is not yet trusted, the test ran
+with `pi --approve`. The index is stored in ignored `docmcp-data/`. A follow-up
+12-query Pi-agent batch on that persistent snapshot reached Top-5 in 11/12 cases;
+the direct-exposure answer ranked 3. See the [Pi-agent report](2026-10-02-pi-agent-mcp-validation.md)
+for the per-query results. It differs from the fresh-crawl benchmark above.
 
 ## Rejected experiments
 
@@ -86,8 +99,10 @@ go test -p 1 -count=1 -tags=integration ./...
 DOCMCP_TEST_LOCAL=1 go test -p 1 -count=1 -tags=provider ./...
 go vet ./...
 golangci-lint run
+make ci
 git diff --check
 goreleaser check
+goreleaser check --config .goreleaser-alpha.yaml
 DOCMCP_TEST_LIVE_BENCH=1 go test ./internal/app -run '^TestLivePiBenchmark$' -count=1 -v
 ```
 
@@ -99,17 +114,21 @@ Manual inspection shows that this append precedes worker creation. Worker
 appends use the existing mutex. The race suite passed. This finding did not
 cause a change to the crawler.
 
-The isolated snapshot attempt passed configuration validation but failed during
-`go mod tidy` because `proxy.golang.org` DNS lookup timed out. No platform binary
-was built or published. That staging run used HEAD implementation with the
-updated release configuration, not the current retrieval implementation.
+The first isolated snapshot attempt failed during `go mod tidy` because
+`proxy.golang.org` DNS lookup timed out. A later default-profile attempt resolved
+dependencies but failed to cross-compile Linux ARM64 cgo on this host. The
+approved `.goreleaser-alpha.yaml` profile then built a Linux amd64 snapshot. I
+extracted its archive and ran `docmcp version` and `docmcp --help` successfully.
+This first-alpha profile has no signatures or SBOMs. The default full-platform
+profile remains unverified. `make ci`, both GoReleaser config checks, and a local
+`go install ./cmd/docmcp` smoke test passed.
 
 ## Remaining work and limitations
 
-- Resolve the direct-exposure miss with a new benchmark-supported hypothesis.
 - Complete table-context evaluation and the remaining UX, redaction, diagnostics,
   performance, stdio, and installation tasks in the plan.
-- Complete snapshot and fresh-install checks in a suitable build environment.
+- Complete the full signed multi-platform snapshot with cross-compilers.
+  The limited Linux amd64 alpha archive passed its install smoke test.
 - Identifier queries scan the full scoped library corpus. There is no separate
   lexical index or cache.
 - Failed reindex can remove the target library's chunks before a replacement

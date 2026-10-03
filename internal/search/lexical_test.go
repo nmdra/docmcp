@@ -10,6 +10,40 @@ import (
 	"github.com/docmcp/docmcp/internal/store"
 )
 
+func TestSearch_AcronymQueryFindsDirectAnswerWithinResultBudget(t *testing.T) {
+	target := chunk(
+		"z-direct-exposure", libraryA,
+		"Direct exposure declares an MCP tool to the model like a built-in tool.",
+		[3]float32{1, 0, 0},
+	)
+	target.Title = "Pi MCP documentation"
+	target.HeadingPath = "Control tool exposure"
+
+	chunks := []store.Chunk{target}
+	for _, id := range []string{
+		"a-overview", "b-setup", "c-oauth", "d-transport",
+		"e-resources", "f-extensions", "g-permissions", "h-commands",
+	} {
+		chunks = append(chunks, chunk(id, libraryA,
+			"General documentation about configuring a server: "+id, [3]float32{0, 1, 0}))
+	}
+	engine := newTestEngine(t, chunks...)
+
+	got, err := engine.Search(t.Context(), search.Request{
+		LibraryID: libraryA,
+		Query:     "How does direct MCP exposure work?",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, result := range got {
+		if result.Chunk.ID == target.ID {
+			return
+		}
+	}
+	t.Fatalf("direct-exposure answer is absent from the normal result budget: %+v", got)
+}
+
 func TestSearch_LexicalFindsTechnicalIdentifiersOutsideDenseCandidates(t *testing.T) {
 	for _, identifier := range []string{"oauth.clientName", "defaultTools", "query-docs", "resolve-library-id", "/reload"} {
 		t.Run(identifier, func(t *testing.T) {
@@ -42,15 +76,19 @@ func (s *listingStore) ListChunks(context.Context, store.ListFilter) ([]store.Ch
 }
 
 func TestSearch_LexicalFailureIsReported(t *testing.T) {
-	failure := errors.New("listing failed")
-	st := &listingStore{Store: newMemoryStore(), err: failure}
-	engine, err := search.NewEngine(st, &fixedEmbedder{}, search.DefaultOptions())
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = engine.Search(t.Context(), search.Request{LibraryID: libraryA, Query: "codeMode"})
-	if !errors.Is(err, failure) || !strings.Contains(err.Error(), "lexical") {
-		t.Fatalf("error = %v, want lexical listing failure", err)
+	for _, query := range []string{"codeMode", "How does HTTP work?"} {
+		t.Run(query, func(t *testing.T) {
+			failure := errors.New("listing failed")
+			st := &listingStore{Store: newMemoryStore(), err: failure}
+			engine, err := search.NewEngine(st, &fixedEmbedder{}, search.DefaultOptions())
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = engine.Search(t.Context(), search.Request{LibraryID: libraryA, Query: query})
+			if !errors.Is(err, failure) || !strings.Contains(err.Error(), "lexical") {
+				t.Fatalf("error = %v, want lexical listing failure", err)
+			}
+		})
 	}
 }
 

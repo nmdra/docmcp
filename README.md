@@ -113,6 +113,36 @@ The server speaks stdio, so any MCP client can launch it as a subprocess.
 For a client that resolves binaries from your `PATH`, that block is the whole
 setup. `examples/` has ready-made files for Claude Code, Cursor, and Pi.
 
+### Pi agent
+
+Install DocMCP and index a documentation site:
+
+```bash
+go install github.com/docmcp/docmcp/cmd/docmcp@latest
+docmcp add https://example.com/docs/ --name example
+```
+
+Register DocMCP with Pi:
+
+```bash
+pi mcp add docmcp --exposure direct -- "$(command -v docmcp)" serve
+pi mcp list
+```
+
+This command writes to Pi's user-level MCP config. Direct exposure makes both
+DocMCP tools available to the model. The index uses DocMCP's default data path.
+
+Start Pi and use this integration prompt:
+
+```text
+Use resolve-library-id to find the Example library. Then use query-docs to
+answer: How does key rotation work? Cite the source heading and URL.
+```
+
+Pi calls `resolve-library-id` before `query-docs`, unless you provide an exact
+library ID. To use a project-level Pi config, add `--local` to `pi mcp add`.
+Pi loads `.pi/mcp.json` only after you trust the project.
+
 ## Configuration
 
 Config lives at `~/.config/docmcp/config.toml`. It is optional: every value has a
@@ -171,10 +201,12 @@ For a shared index with incompatible vectors, rebuild all libraries in a fresh
 `--data-dir`. A scoped reindex refuses to mark the other libraries' old vectors
 as compatible.
 
-Search combines semantic retrieval with local BM25 and rank fusion for explicit
-technical identifiers, such as `/reload`, `oauth.clientName`, and `query-docs`.
-Ordinary natural-language queries use semantic retrieval. Identifier queries
-scan the library's local chunks; no extra database or network access is required.
+Search keeps semantic ranking for natural-language queries. It combines semantic
+retrieval with local BM25 and rank fusion when a query contains technical
+identifier syntax or an all-caps token in a mixed-case query, such as `/reload`,
+`oauth.clientName`, `query-docs`, or `MCP`. All-caps emphasis can also select
+hybrid retrieval. These queries scan the library's local chunks; no extra
+database or network access is required.
 
 ## Scope and safety
 

@@ -16,7 +16,7 @@ remain the specification, not a claim that every task is complete.
 - [x] Reembed chunks when title metadata changes without body changes.
 - [x] Add reversible adjacent-run diversification and stable score ties.
 - [x] Preserve nonzero chunk indices through Chroma query metadata.
-- [x] Add BM25 candidates and RRF for explicit technical-identifier queries.
+- [x] Add BM25 candidates and RRF for identifier syntax and all-caps query tokens.
 - [x] Complete retrieval review fixes for cancellation and discriminating tests.
 - [x] Bypass adjacent-run suppression when chunk indices are ambiguous.
 - [x] Freeze query, resolver, and public MCP contract output with golden tests.
@@ -24,26 +24,34 @@ remain the specification, not a claim that every task is complete.
 - [x] Centralize finite-value and dimension checks across embedding providers.
 - [x] Reject inconsistent unknown vector widths within and across service batches.
 - [x] Persist actual dimensions for providers whose configured width is unknown.
-- [ ] Fix the remaining direct-MCP-exposure miss without benchmark regression.
+- [x] Fix the direct-MCP-exposure miss with acronym-aware hybrid retrieval and benchmark gates.
 - [x] Correct the GoReleaser repository identity and pass `goreleaser check`.
-- [ ] Complete snapshot builds. The isolated attempt failed at dependency DNS lookup.
+- [x] Build and install-test the approved Linux amd64 alpha snapshot profile.
+- [ ] Complete the full signed multi-platform snapshot. This host lacks the Linux ARM64 cgo cross-compiler.
 - [ ] Complete table-context, UX, security, diagnostics, and release tasks.
 
 Latest measured synthetic results: topic Recall@5 1.000, expanded MRR 0.874,
 and original-subset MRR 0.864. Gold-page Top-3 is 92.7%; Top-5 is 97.6%.
 
-Latest live results: Top-1 8/12, Top-3 10/12, Top-5 11/12, MRR 0.771.
-The original six queries reach Top-5 in 5/6 cases. Direct exposure remains a miss.
-These measurements do not establish the complete public-alpha release gate.
+Latest live results after acronym-aware routing: Top-1 8/12, Top-3 11/12,
+Top-5 12/12, MRR 0.812, and Recall@5 1.000. The original six queries reach
+Top-5 in 6/6 cases. Direct exposure ranks 2 and returns the answer-bearing text.
+A separate 12-query Pi-agent batch over the persistent project snapshot matched
+all queries within six results, with 11/12 in Top-5; direct exposure ranked 3.
+See `docs/validation/2026-10-02-pi-agent-mcp-validation.md`. The limited alpha
+profile builds Linux amd64 only and omits signatures and SBOMs. The full signed
+multi-platform release gate remains open.
 
 Unrestricted natural-language lexical fusion regressed synthetic MRR, so it was
-rejected. Identifier routing preserves dense retrieval for ordinary paraphrases.
-Identifier queries scan the local library corpus. No second database was added.
+rejected. Syntax-bearing identifiers and all-caps tokens in mixed-case queries
+now enable BM25/RRF; other prose retains dense ranking. All-caps emphasis can
+also select hybrid retrieval. Identifier queries scan the local library corpus.
+No second database was added.
 
 A bounded leaf-heading promotion experiment reduced original-subset MRR from
-0.864 to 0.850, so it was also rejected. Candidate diagnostics place the remaining
-direct-exposure answer at rank 7 after diversification. Further work needs a new
-hypothesis, not a larger manually tuned promotion.
+0.864 to 0.850, so it was rejected. The direct-exposure regression is now covered
+by a focused result-budget test, exact live answer-content relevance, and the
+original-query Top-5 gate.
 
 ## 1. Objective
 
@@ -72,16 +80,17 @@ The validation report establishes that:
 - stdio MCP framing is clean;
 - previously discovered crawler/security/parser defects have regression tests.
 
-The main remaining product weakness is retrieval quality:
+The initial validation identified retrieval quality as the main product weakness:
 
 ```text
-Live benchmark:
+Initial live benchmark:
 Top-1: 2/6
 Top-3: 4/6
 Top-5: 4/6
 ```
 
-Two normal user queries fail despite the correct content being present in the index.
+Subsequent work improved these results. The execution-status section above records
+the current benchmark, including the direct-exposure fix.
 
 Therefore the implementation priority is:
 
@@ -122,11 +131,11 @@ The report confirms regression tests exist for each fixed defect.
 
 These fixes should not be redesigned unless a new failing test demonstrates a problem.
 
-## Known open issues
+## Issues noted by baseline validation
 
 ### Retrieval
 
-Two live queries currently miss:
+The baseline validation recorded two live misses. Both have since been fixed:
 
 ```text
 "How does direct MCP exposure work?"
@@ -138,25 +147,13 @@ and:
 "How do I use slash commands in the editor?"
 ```
 
-The first reaches the right page but ranks the wrong section first.
-
-The second suffers because short explanatory content is overshadowed by command/table chunks.
+The direct-exposure answer now ranks second. The slash-command overview now ranks
+first. The latest real-site benchmark recorded Top-5 12/12.
 
 ### Release configuration
 
-`.goreleaser.yaml` still refers to:
-
-```text
-docmcp/docmcp
-```
-
-instead of:
-
-```text
-nmdra/docmcp
-```
-
-according to the validation report.
+The baseline report identified the old `docmcp/docmcp` owner. The repository
+identity now points to `nmdra/docmcp`, and `goreleaser check` passed.
 
 ### Crawl edge case
 
